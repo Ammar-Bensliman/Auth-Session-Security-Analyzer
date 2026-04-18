@@ -1,0 +1,121 @@
+[
+  {
+    "id": "MASVS-AUTH-1",
+    "title": "Authentification serveur avec protocole sécurisé",
+    "description": "Si l'application donne accès à un service distant, une forme d'authentification complète (comme une combinaison nom d'utilisateur/mot de passe ou un token cryptographique) est demandée côté serveur. L'authentification ne doit jamais se limiter à du pure 'côté client'.",
+    "mastg_tests": ["MASTG-TEST-0019"],
+    "remediation": "Veiller à ce que l'API exige toujours un jeton ou un cookie valide pour toute route sensible. L'authentification côté mobile sert uniquement à l'utilisabilité, pas à la sécurité réelle."
+  },
+  {
+    "id": "MASVS-AUTH-2",
+    "title": "Prévention de contournement (Bypass) d'authentification",
+    "description": "Il n'est pas possible d'exécuter des actions à privilèges élevés en contournant l'interface d'authentification ou en falsifiant un simple booléen 'is_admin = true' en local.",
+    "mastg_tests": ["MASTG-TEST-0020"],
+    "remediation": "Tout contrôle d'autorisation doit s'opérer sur le serveur en extrayant les droits directement du jeton (par exemple avec la signature JWT) et jamais en faisant confiance à un payload renvoyé par le client."
+  },
+  {
+    "id": "MASVS-AUTH-3",
+    "title": "Non-utilisation d'identifiants falsifiables (IMEI, MAC)",
+    "description": "L'application ne s'appuie jamais sur des valeurs falsifiables ou spécifiques à l'appareil comme le code IMEI, l'adresse MAC, ou l'Android_ID comme seul facteur d'authentification ou d'identification de l'utilisateur.",
+    "mastg_tests": ["MASTG-TEST-0021"],
+    "remediation": "Générez plutôt un UUID aléatoire (UUIDv4) au moment de l'installation et stockez-le en toute sécurité (Keystore/EncryptedSharedPreferences) si l'identification de l'appareil est absolument nécessaire."
+  },
+  {
+    "id": "MASVS-AUTH-4",
+    "title": "Rate Limiting et Blocage de compte (Bruteforce)",
+    "description": "Le serveur endpoint impose une politique de verrouillage de compte après un certain nombre de tentatives de connexion échouées, ou utilise des mécanismes de limitation de débit (API Rate Limiting) contre le bruteforce.",
+    "mastg_tests": ["MASTG-TEST-0022"],
+    "remediation": "Implémentez une politique interdisant plus de 5 échecs par adresse IP ou nom d'utilisateur par 15 minutes, et déployez un dispositif type CAPTCHA/WAF si applicable."
+  },
+  {
+    "id": "MASVS-AUTH-5",
+    "title": "Verrouillage après inactivité et gestion des timeouts",
+    "description": "Les sessions expirent implicitement après une période prédéfinie d'inactivité ou au bout d'un temps de vie absolu fixé de manière stricte (ex: JWT exp < 15 minutes). Une expiration côté serveur est obligatoire, indépendamment du client.",
+    "mastg_tests": ["MASTG-TEST-0024"],
+    "remediation": "Configurez des temps d'expiration stricts. Pour de meilleures performances, utilisez une architecture de tokens Access (15m) + Refresh Token rotatifs. Invalidez côté serveur à l'expiration."
+  },
+  {
+    "id": "MASVS-AUTH-6",
+    "title": "Invalidation des sessions à la déconnexion",
+    "description": "Les sessions doivent systématiquement être invalidées côté serveur lorsque l'utilisateur déclenche une déconnexion ('logout'). La simple suppression du token côté client est insuffisante.",
+    "mastg_tests": ["MASTG-TEST-0025"],
+    "remediation": "Si vous utilisez des sessions sans état (JWT), implémentez une 'Deny List' (liste de révocation) côté serveur ou diminuez massivement la durée de validité du token (< 5 minutes)."
+  },
+  {
+    "id": "MASVS-AUTH-7",
+    "title": "Stockage sécurisé des secrets et clés API",
+    "description": "Les jetons de session, clés API, ou mots de passe ne doivent jamais être stockés en clair sur l'appareil (par exemple dans le dossier `res/values/strings.xml`, les SharedPreferences traditionnelles ou codés en dur dans le bytecode Java/Kotlin).",
+    "mastg_tests": ["MASTG-TEST-0023", "MASTG-TEST-0001"],
+    "remediation": "Utilisez `EncryptedSharedPreferences` de la bibliothèque AndroidX Security Crypto, et chiffrez les données locales à l'aide d'une clé maîtresse stockée par le Hardware-backed Android Keystore."
+  },
+  {
+    "id": "MASVS-AUTH-8",
+    "title": "Authentification biométrique robuste",
+    "description": "Si la biométrie (empreinte, FaceID) est utilisée pour donner accès à la session, elle s'appuie sur le framework officiel `BiometricPrompt` lié avec une opération de déverrouillage cryptographique (Keystore), pas uniquement sur un retour binaire booléen (success = true).",
+    "mastg_tests": ["MASTG-TEST-0026"],
+    "remediation": "Lier une clé cryptographique symétrique (AES) générée par le système au moment du login. L'accès à la clé doit nécessiter une autorisation `setUserAuthenticationRequired(true)` via biométrie."
+  },
+  {
+    "id": "MASVS-AUTH-9",
+    "title": "Transfert réseau sécurisé (Anti-sniffing et cookies)",
+    "description": "Les jetons d'accès ne doivent jamais être passés par l'URL dynamique (requêtes GET). Si envoyés sous forme de cookies, ils se doivent d'employer les drapeaux 'Secure' (TLS obligatoire) et 'HttpOnly' (inaccessible au JS XSS).",
+    "mastg_tests": ["MASTG-TEST-0027", "MASTG-TEST-0021"],
+    "remediation": "Transférez toujours les tokens dans l'en-tête HTTP 'Authorization: Bearer <token>' lors d'appels API ou via un cookie fortement sécurisé `SameSite=Strict; Secure; HttpOnly`."
+  },
+  {
+    "id": "MASVS-AUTH-10",
+    "title": "Rotation des Refresh Tokens (Token Rotation)",
+    "description": "Chaque utilisation d'un refresh token doit générer un nouveau refresh token et invalider l'ancien (rotation). Cette pratique détecte les tentatives de rejeu (replay attacks) et limite l'impact d'une fuite de refresh token.",
+    "mastg_tests": ["MASTG-TEST-0024", "MASTG-TEST-0025"],
+    "remediation": "Implémentez la rotation de refresh token côté serveur. En cas de double utilisation (replay détecté), révoquer immédiatement TOUS les tokens de la famille. Stocker les refresh tokens avec une date d'expiration absolue (ex: 30 jours)."
+  },
+  {
+    "id": "MASVS-AUTH-11",
+    "title": "Protection contre la fixation de session",
+    "description": "Après chaque élévation de privilège (connexion, MFA validé, changement de rôle), un nouvel identifiant de session doit être émis. L'ancien identifiant doit être invalidé pour prévenir les attaques de fixation de session.",
+    "mastg_tests": ["MASTG-TEST-0020", "MASTG-TEST-0025"],
+    "remediation": "Régénérez systématiquement le session ID / token lors des opérations sensibles (login, sudo, élévation de privilège). N'acceptez jamais de session ID fourni par le client lui-même."
+  },
+  {
+    "id": "MASVS-STORAGE-1",
+    "title": "Données sensibles non stockées en clair",
+    "description": "Les données sensibles (PII, mots de passe, tokens, clés privées) ne doivent jamais être stockées en clair sur le système de fichiers de l'appareil, dans les SharedPreferences, les bases de données SQLite non chiffrées, les journaux (logs), ou dans le cache HTTP.",
+    "mastg_tests": ["MASTG-TEST-0001", "MASTG-TEST-0002"],
+    "remediation": "Utilisez le chiffrement AES-256-GCM pour les données locales persistantes. Sur Android, combinez EncryptedSharedPreferences et Room avec SQLCipher. Sur iOS, stockez dans le Keychain avec l'attribut kSecAttrAccessibleWhenUnlockedThisDeviceOnly."
+  },
+  {
+    "id": "MASVS-STORAGE-2",
+    "title": "Pas de données sensibles dans les logs système",
+    "description": "L'application ne doit écrire aucune donnée sensible (token, PII, mot de passe, clé) dans les journaux système Android (Logcat) ou iOS (ASL/os_log) accessibles par d'autres applications ou en mode debug.",
+    "mastg_tests": ["MASTG-TEST-0003"],
+    "remediation": "En production, supprimez tous les appels à Log.d() / System.out.println() contenant des données sensibles. Utilisez des bibliothèques de logging avec redaction automatique (ex: Timber avec règles de filtrage) et désactivez le mode verbose en release."
+  },
+  {
+    "id": "MASVS-STORAGE-3",
+    "title": "Pas de données sensibles dans les sauvegardes",
+    "description": "Les mécanismes de backup Android (Auto Backup, adb backup) ou iOS (iCloud Backup) ne doivent pas inclure de données sensibles comme les tokens de session, clés privées, ou données personnelles non chiffrées.",
+    "mastg_tests": ["MASTG-TEST-0004"],
+    "remediation": "Dans le AndroidManifest.xml, configurez `android:allowBackup='false'` ou utilisez des règles d'exclusion précises via `android:fullBackupContent`. Sur iOS, marquez les données sensibles dans le Keychain avec kSecAttrSynchronizable=false."
+  },
+  {
+    "id": "MASVS-NETWORK-1",
+    "title": "Sécurisation des communications réseau (TLS)",
+    "description": "Toutes les communications réseau vers des services distants doivent utiliser TLS 1.2 minimum (TLS 1.3 recommandé). L'application ne doit pas accepter de certificats auto-signés, expirés, ou invalides en production.",
+    "mastg_tests": ["MASTG-TEST-0014", "MASTG-TEST-0015"],
+    "remediation": "Configurez le Network Security Config (Android) ou ATS (iOS) pour interdire les connexions en clair. Forcez TLS 1.3 et les suites cryptographiques modernes (ECDHE + AES-GCM). Implémentez la validation stricte de la chaîne de certificats."
+  },
+  {
+    "id": "MASVS-NETWORK-2",
+    "title": "Certificate Pinning pour les endpoints critiques",
+    "description": "Pour les endpoints sensibles (authentification, paiement, données PII), l'application doit implémenter le certificate pinning pour valider non seulement la chaîne de confiance PKI mais aussi l'identité précise du certificat serveur distant.",
+    "mastg_tests": ["MASTG-TEST-0016"],
+    "remediation": "Implémentez le pinning du hash de la clé publique (SPKI pinning) plutôt que du certificat complet, pour permettre le renouvellement. Sur Android, utilisez OkHttp `CertificatePinner`. Prévoyez un mécanisme de bypass d'urgence et une rotation de pins."
+  },
+  {
+    "id": "MASVS-RESILIENCE-1",
+    "title": "Protection contre le reverse engineering (Anti-tampering)",
+    "description": "L'application doit détecter et répondre aux tentatives de manipulation de son environnement d'exécution : root/jailbreak, debuggers attachés, instrumentation dynamique (Frida/Objection), émulateurs, et modification du bytecode.",
+    "mastg_tests": ["MASTG-TEST-0029", "MASTG-TEST-0030"],
+    "remediation": "Implémentez des contrôles de détection de root (RootBeer sur Android), de l'obfuscation du code (R8/ProGuard avec règles agressives), et de l'intégrité de l'application (signature APK checksum). Ne bloquez pas purement le runtime car contournable — utilisez ces données pour le risk scoring côté serveur."
+  }
+]

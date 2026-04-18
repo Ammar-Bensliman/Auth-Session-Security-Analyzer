@@ -1,0 +1,43 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: auth-analyzer-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Code source (hot-reload en développement)
+      - ./backend:/app/backend
+      # Données persistantes partagées (uploads, extracts, chroma_db, DB SQLite)
+      - app_data:/app/data
+    environment:
+      - ENV=development
+      - DATABASE_URL=sqlite:////app/data/analyzer.db
+      # Chemins Docker absolus (overrides les valeurs de config.py)
+      - UPLOAD_DIR=/app/data/uploads
+      - EXTRACT_DIR=/app/data/extracts
+      - CHROMA_DIR=/app/data/chroma_db
+      # Désactiver l'avertissement HuggingFace tokenizer
+      - TOKENIZERS_PARALLELISM=false
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: auth-analyzer-frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      # URL du backend accessible depuis le NAVIGATEUR (pas depuis le container)
+      # En dev local avec Docker Desktop : utiliser localhost
+      - VITE_API_URL=http://localhost:8000
+    restart: unless-stopped
+
+volumes:
+  app_data:
+    driver: local

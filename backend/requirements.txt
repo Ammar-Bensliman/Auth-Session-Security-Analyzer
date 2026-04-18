@@ -1,0 +1,44 @@
+# Core Web / API
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# Data Models & Config
+pydantic>=2.6.0
+pydantic-settings>=2.2.1
+
+# Database
+SQLAlchemy>=2.0.29
+
+# File Parsers & Analyzers
+PyJWT>=2.8.0
+lxml>=5.2.1
+
+# IA / RAG
+# IMPORTANT: Forcer PyTorch CPU-only pour Docker (évite le téléchargement de
+# 900MB de binaires CUDA qui ne servent pas en prod sans GPU)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
+langchain>=0.1.13
+langchain-google-genai>=1.0.1
+chromadb>=0.4.24
+sentence-transformers>=2.6.1
+
+# Reporting Export
+Jinja2>=3.1.3
+openpyxl>=3.1.2
+
+# Testing & Dev
+pytest>=8.1.1
+requests>=2.31.0
+httpx>=0.27.0
+
+# NOTE: Les dépendances suivantes sont optionnelles / externes :
+# - semgrep : fonctionne nativement sur Linux (Docker) — ajouté ci-dessus
+# - androguard : `pip install androguard` (peut nécessiter Visual C++ sur Windows)
+# - WeasyPrint : `pip install weasyprint` (nécessite GTK sur Windows — non utilisé actuellement)
+# - celery + redis : non utilisés (BackgroundTasks FastAPI est utilisé à la place)
+# - alembic : non utilisé (SQLAlchemy create_all suffit)
+
+# SAST — Analyse statique de code (Linux/Docker uniquement)
+semgrep>=1.70.0

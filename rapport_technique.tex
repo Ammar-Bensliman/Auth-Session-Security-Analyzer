@@ -1,0 +1,1271 @@
+%% =========================================================
+%%  AUTH & SESSION SECURITY ANALYZER
+%%  Rapport Technique Complet — Architecture, Outils & Pipeline
+%%  Compilez avec: pdflatex rapport.tex (2 passes)
+%% =========================================================
+\documentclass[12pt,a4paper,french]{article}
+
+%% ── Encodage & Langue ──────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{csquotes}
+
+%% ── Mise en page ────────────────────────────────────────────
+\usepackage[top=2.5cm, bottom=2.5cm, left=3cm, right=3cm]{geometry}
+\usepackage{setspace}
+\setstretch{1.15}
+
+%% ── Typographie ─────────────────────────────────────────────
+\usepackage{lmodern}
+\usepackage{microtype}
+
+%% ── Couleurs ────────────────────────────────────────────────
+\usepackage{xcolor}
+\definecolor{primary}{HTML}{3B82F6}       % bleu
+\definecolor{purple}{HTML}{8B5CF6}        % violet
+\definecolor{green}{HTML}{10B981}         % vert
+\definecolor{red}{HTML}{EF4444}           % rouge
+\definecolor{orange}{HTML}{F59E0B}        % orange
+\definecolor{darkbg}{HTML}{0F172A}        % fond sombre
+\definecolor{codebg}{HTML}{1E293B}        % fond code
+\definecolor{mutedtxt}{HTML}{64748B}      % texte secondaire
+\definecolor{mavscolor}{HTML}{6366F1}     % indigo MASVS
+
+%% ── Graphiques & TikZ ───────────────────────────────────────
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc,
+                decorations.pathreplacing, backgrounds, fit, shadows}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+
+%% ── Listes & Tableaux ───────────────────────────────────────
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{colortbl}
+
+%% ── Code source ─────────────────────────────────────────────
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{codebg},
+  rulecolor=\color{primary},
+  frame=single,
+  framesep=4pt,
+  framerule=0.4pt,
+  xleftmargin=10pt,
+  xrightmargin=10pt,
+  breaklines=true,
+  breakatwhitespace=true,
+  showstringspaces=false,
+  keywordstyle=\color{primary}\bfseries,
+  commentstyle=\color{mutedtxt}\itshape,
+  stringstyle=\color{green},
+  numberstyle=\tiny\color{mutedtxt},
+  numbers=left,
+  numbersep=8pt,
+  columns=flexible,
+  keepspaces=true,
+  literate={é}{{\'{e}}}1 {è}{{\`{e}}}1 {à}{{\`{a}}}1 {ê}{{\^{e}}}1
+           {î}{{\^{i}}}1 {ô}{{\^{o}}}1 {û}{{\^{u}}}1 {ù}{{\`{u}}}1
+           {â}{{\^{a}}}1 {ç}{{\c{c}}}1 {É}{{\'{E}}}1 {À}{{\`{A}}}1
+}
+
+%% ── Boîtes colorées ─────────────────────────────────────────
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{listings, breakable, skins}
+
+\tcbset{
+  mavsbox/.style={
+    enhanced, breakable,
+    colback=mavscolor!8!white,
+    colframe=mavscolor,
+    fonttitle=\bfseries\small,
+    coltitle=white,
+    attach boxed title to top left={yshift=-2mm, xshift=4mm},
+    boxed title style={colback=mavscolor, rounded corners},
+    arc=4pt, boxrule=0.6pt,
+    before skip=8pt, after skip=8pt
+  },
+  toolbox/.style={
+    enhanced,
+    colback=primary!6!white,
+    colframe=primary!60!white,
+    fonttitle=\bfseries\small,
+    arc=4pt, boxrule=0.6pt,
+    before skip=6pt, after skip=6pt
+  },
+  warnbox/.style={
+    enhanced,
+    colback=orange!8!white,
+    colframe=orange!70!white,
+    fonttitle=\bfseries\small,
+    arc=4pt, boxrule=0.6pt,
+    before skip=6pt, after skip=6pt
+  },
+  successbox/.style={
+    enhanced,
+    colback=green!6!white,
+    colframe=green!60!white,
+    fonttitle=\bfseries\small,
+    arc=4pt, boxrule=0.6pt,
+    before skip=6pt, after skip=6pt
+  },
+  dangerbox/.style={
+    enhanced,
+    colback=red!6!white,
+    colframe=red!60!white,
+    fonttitle=\bfseries\small\color{red},
+    arc=4pt, boxrule=0.6pt,
+    before skip=6pt, after skip=6pt
+  }
+}
+
+%% ── Liens hypertexte ────────────────────────────────────────
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=primary,
+  urlcolor=purple,
+  citecolor=green,
+  pdftitle={Auth \& Session Security Analyzer — Rapport Technique},
+  pdfauthor={Projet Antigravity},
+  pdfsubject={OWASP MASVS · DevSecOps · Mobile AppSec}
+}
+
+%% ── En-têtes & Pieds de page ────────────────────────────────
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textcolor{mutedtxt}{Auth \& Session Security Analyzer}}
+\fancyhead[R]{\small\textcolor{mutedtxt}{Rapport Technique}}
+\fancyfoot[C]{\small\textcolor{mutedtxt}{\thepage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{primary}\leaders\hrule height\headrulewidth\hfill}}
+
+%% ── Sections personnalisées ─────────────────────────────────
+\usepackage{titlesec}
+\titleformat{\section}
+  {\color{primary}\large\bfseries}{\thesection}{0.8em}{}
+  [\color{primary}\titlerule]
+\titleformat{\subsection}
+  {\color{purple}\normalsize\bfseries}{\thesubsection}{0.7em}{}
+\titleformat{\subsubsection}
+  {\color{mutedtxt}\normalsize\bfseries}{\thesubsubsection}{0.6em}{}
+
+%% ── Tables des matières ─────────────────────────────────────
+\usepackage{tocloft}
+\renewcommand{\cftsecfont}{\color{primary}\bfseries}
+\renewcommand{\cftsubsecfont}{\color{purple}}
+\renewcommand{\cftsecpagefont}{\color{primary}}
+
+%% ── Commandes utilitaires ───────────────────────────────────
+\newcommand{\badge}[2]{%
+  \colorbox{#1!15}{\textcolor{#1}{\small\textbf{#2}}}%
+}
+\newcommand{\masvs}[1]{\badge{mavscolor}{\texttt{#1}}}
+\newcommand{\mastg}[1]{\badge{primary}{\texttt{#1}}}
+\newcommand{\tool}[1]{\textcolor{purple}{\textbf{#1}}}
+\newcommand{\file}[1]{\textcolor{primary}{\texttt{#1}}}
+\newcommand{\critical}[1]{\textcolor{red}{\textbf{#1}}}
+\newcommand{\ok}[1]{\textcolor{green}{\textbf{#1}}}
+
+%% ── Métadonnées ─────────────────────────────────────────────
+\title{%
+  \vspace{-1cm}
+  {\Huge\textbf{\textcolor{primary}{Auth \& Session}}}\\[4pt]
+  {\Huge\textbf{\textcolor{purple}{Security Analyzer}}}\\[8pt]
+  {\large\textcolor{mutedtxt}{Rapport Technique Complet}}\\[4pt]
+  {\normalsize\textcolor{mutedtxt}{Architecture · Outils · Pipeline d'Analyse · Standards OWASP MASVS v2}}
+}
+\author{%
+  \textbf{Projet Antigravity}\\
+  \small\textcolor{mutedtxt}{DevSecOps · Mobile AppSec · OWASP MASVS/MASTG}
+}
+\date{\textcolor{mutedtxt}{Avril 2026}}
+
+%% =========================================================
+\begin{document}
+%% =========================================================
+
+\maketitle
+\thispagestyle{empty}
+
+\vspace{0.5cm}
+
+%% Bannière descriptive
+\begin{tcolorbox}[
+  enhanced,
+  colback=darkbg,
+  colframe=primary,
+  fontupper=\color{white}\normalsize,
+  arc=8pt, boxrule=1pt,
+  left=12pt, right=12pt, top=10pt, bottom=10pt
+]
+\textbf{Auth \& Session Security Analyzer} est un outil d'audit automatisé de la sécurité
+d'authentification pour applications mobiles Android.
+Il combine l'analyse \textbf{SAST} (statique), l'analyse \textbf{DAST} (dynamique),
+une intelligence artificielle \textbf{RAG + Gemini} et une couverture complète des standards
+\textbf{OWASP MASVS v2} / \textbf{MASTG} pour produire des Checklists de sécurité,
+des critères d'acceptation \textbf{Agile} et des scénarios \textbf{Gherkin} prêts pour Jira.
+\end{tcolorbox}
+
+\vspace{0.4cm}
+\tableofcontents
+\newpage
+
+%% ==========================================================
+\section{Présentation Générale du Projet}
+%% ==========================================================
+
+\subsection{Contexte et Objectifs}
+
+Les applications mobiles exposent souvent des vulnérabilités critiques liées à
+l'authentification et à la gestion des sessions : tokens mal stockés, sessions
+non révoquées après déconnexion, algorithmes faibles ou absents dans les JWT,
+absence de certificate pinning, etc.
+
+L'objectif de l'\textbf{Auth \& Session Security Analyzer} est de résoudre ce problème
+en agissant comme un \textit{auditeur DevSecOps automatisé} qui :
+
+\begin{itemize}[leftmargin=1.5cm, itemsep=4pt]
+  \item[\textcolor{primary}{$\blacktriangleright$}]
+    Analyse les APKs Android (analyse statique SAST) et les logs de trafic réseau (DAST)
+  \item[\textcolor{primary}{$\blacktriangleright$}]
+    Génère des checklists de sécurité alignées \textbf{MASVS v2} grâce à l'IA
+  \item[\textcolor{primary}{$\blacktriangleright$}]
+    Produit des \textit{Security Acceptance Criteria} directement intégrables dans des User Stories Jira
+  \item[\textcolor{primary}{$\blacktriangleright$}]
+    Implémente le principe \textbf{Shift-Left} : la sécurité est intégrée dès la conception
+  \item[\textcolor{primary}{$\blacktriangleright$}]
+    Exporte des rapports complets en Markdown et JSON pour les équipes sécurité
+\end{itemize}
+
+\subsection{Stack Technologique}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{lll}
+\toprule
+\textbf{Couche} & \textbf{Technologies} & \textbf{Version} \\
+\midrule
+\rowcolor{primary!6}
+Backend API     & Python, FastAPI, Uvicorn            & Python 3.11+ / FastAPI 0.110+ \\
+Base de données & SQLite, SQLAlchemy ORM              & SQLAlchemy 2.0+ \\
+\rowcolor{primary!6}
+IA / RAG        & Google Gemini, LangChain, ChromaDB  & Gemini 2.5 Flash \\
+Embeddings      & SentenceTransformer (MiniLM)        & all-MiniLM-L6-v2 \\
+\rowcolor{primary!6}
+SAST            & Semgrep, Apktool, JADX              & Semgrep 1.66+ \\
+DAST            & Parsers custom Python               & PyJWT 2.8+ \\
+\rowcolor{primary!6}
+Frontend        & React, TypeScript, TailwindCSS, Vite & React 18 / Vite 5 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%% ==========================================================
+\section{Architecture du Projet}
+%% ==========================================================
+
+\subsection{Vue d'Ensemble de la Structure}
+
+\begin{lstlisting}[language=bash, caption={Structure des répertoires du projet}]
+Auth-and-Session-Security-Analyzer/
+├── backend/
+│   ├── main.py                  # Point d'entrée FastAPI — registration des routes
+│   ├── core/
+│   │   ├── config.py            # Paramètres (Pydantic Settings, .env)
+│   │   ├── database.py          # Modèles SQLAlchemy + SessionLocal
+│   │   └── models.py            # Modèles Pydantic (Finding, AuditReport, etc.)
+│   ├── api/routes/
+│   │   ├── upload.py            # POST /api/upload/apk — réception de fichiers
+│   │   ├── analyze.py           # POST /api/analyze/start — lancement du pipeline
+│   │   ├── jobs.py              # GET  /api/jobs/ — suivi des jobs en cours
+│   │   ├── report.py            # GET  /api/report/ — consultation des rapports
+│   │   ├── export.py            # GET  /api/export/{id}/markdown|json
+│   │   └── auth_audit.py        # POST /api/auth-audit/generate-checklist
+│   ├── ai/
+│   │   ├── llm_client.py        # Client Gemini via LangChain
+│   │   └── rag_engine.py        # Moteur RAG ChromaDB + SentenceTransformer
+│   ├── analyzers/
+│   │   ├── runner.py            # Chef d'orchestre du pipeline d'analyse
+│   │   ├── semgrep_runner.py    # Wrapper Semgrep (SAST)
+│   │   └── flow_analyzer.py     # Analyse du trafic HTTP (DAST)
+│   ├── parsers/
+│   │   ├── apk_parser.py        # Décompilation APK (Apktool + JADX)
+│   │   ├── manifest_parser.py   # Lecture AndroidManifest.xml
+│   │   ├── traffic_parser.py    # Analyse logs HTTP/Burp
+│   │   └── jwt_parser.py        # Décodage et audit des tokens JWT
+│   └── rules/
+│       ├── semgrep/auth.yaml    # 7 règles SAST custom MASVS-alignées
+│       └── masvs/masvs_auth_full.json  # 17 règles MASVS base RAG
+├── frontend/src/
+│   ├── App.tsx                  # Routage par onglets
+│   ├── components/
+│   │   ├── Scanner.tsx          # Interface upload + suivi analyse
+│   │   ├── AuthAudit.tsx        # Formulaire d'audit IA + résultats
+│   │   ├── MASVSMapping.tsx     # Cartographie des contrôles MASVS
+│   │   └── ReportHistory.tsx    # Historique jobs + rapports
+│   └── index.css                # Système de design dark (variables CSS)
+├── .env                         # Configuration locale (secrets)
+└── docker-compose.yml           # Déploiement conteneurisé
+\end{lstlisting}
+
+\subsection{Diagramme d'Architecture Logicielle}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  node distance=1.2cm and 1.8cm,
+  every node/.style={font=\small},
+  layer/.style={draw=primary, fill=primary!8, rounded corners=6pt,
+                text width=3.5cm, align=center, minimum height=0.9cm,
+                drop shadow={opacity=0.2}},
+  component/.style={draw=#1!60, fill=#1!10, rounded corners=4pt,
+                    text width=2.8cm, align=center, minimum height=0.8cm,
+                    font=\scriptsize\bfseries},
+  arrow/.style={-Stealth, thick, color=primary!70},
+  label/.style={font=\scriptsize\itshape, color=mutedtxt}
+]
+
+%% Ligne 1 — Frontend
+\node[layer] (fe) {\textbf{\textcolor{primary}{Frontend}}\\\scriptsize React + TypeScript};
+
+%% Ligne 2 — API FastAPI
+\node[layer, below=1.4cm of fe] (api) {\textbf{\textcolor{purple}{API FastAPI}}\\\scriptsize REST / JSON};
+
+%% Ligne 3 — Modules backend (côte à côte)
+\node[component=green, below left=1.3cm and 2.8cm of api] (upload) {Upload\\\texttt{/api/upload}};
+\node[component=orange, below left=1.3cm and 0.5cm of api] (analyze) {Analyze\\\texttt{/api/analyze}};
+\node[component=purple, below right=1.3cm and 0.5cm of api] (audit) {Auth Audit\\\texttt{/api/auth-audit}};
+\node[component=primary, below right=1.3cm and 2.8cm of api] (export) {Export\\\texttt{/api/export}};
+
+%% Ligne 4 — Pipeline d'analyse
+\node[component=orange, below=1.4cm of analyze] (runner) {\textbf{Runner}\\\scriptsize Orchestrateur};
+
+%% Ligne 4 — Parsers
+\node[component=primary, below left=1.3cm and 1cm of runner] (apk) {ApkParser\\\scriptsize Apktool+JADX};
+\node[component=primary, below right=1.3cm and 1cm of runner] (traffic) {TrafficParser\\\scriptsize Burp/HAR};
+
+%% Ligne 5 — Analyzers
+\node[component=red, below=1.2cm of apk] (semgrep) {Semgrep\\\scriptsize SAST Rules};
+\node[component=orange, below=1.2cm of traffic] (flow) {FlowAnalyzer\\\scriptsize DAST HTTP};
+\node[component=purple, below=1.2cm of runner] (jwt) {JWTParser\\\scriptsize Token Audit};
+
+%% Ligne 6 — IA
+\node[component=purple, below left=1.3cm and 0.2cm of jwt] (rag) {RAG Engine\\\scriptsize ChromaDB};
+\node[component=primary, below right=1.3cm and 0.2cm of jwt] (llm) {LLM Client\\\scriptsize Gemini API};
+
+%% Ligne 7 — Base
+\node[component=green, below=1.2cm of rag] (db) {SQLite DB\\\scriptsize SQLAlchemy};
+\node[component=orange, below=1.2cm of llm] (mavsdb) {MASVS KB\\\scriptsize 17 règles JSON};
+
+%% Flèches
+\draw[arrow] (fe) -- (api) node[label, midway, right=2pt] {HTTP/REST};
+\draw[arrow] (api) -- (upload);
+\draw[arrow] (api) -- (analyze);
+\draw[arrow] (api) -- (audit);
+\draw[arrow] (api) -- (export);
+\draw[arrow] (analyze) -- (runner);
+\draw[arrow] (runner) -- (apk);
+\draw[arrow] (runner) -- (traffic);
+\draw[arrow] (apk) -- (semgrep);
+\draw[arrow] (traffic) -- (flow);
+\draw[arrow] (runner) -- (jwt);
+\draw[arrow] (runner) -- (rag);
+\draw[arrow] (runner) -- (llm);
+\draw[arrow] (rag) -- (db);
+\draw[arrow] (rag) -- (mavsdb);
+\draw[arrow] (llm.south) to[bend right=10] (db.east);
+
+\end{tikzpicture}
+\caption{Architecture logicielle de l'Auth \& Session Security Analyzer}
+\end{figure}
+
+%% ==========================================================
+\section{Description Détaillée de Chaque Outil}
+%% ==========================================================
+
+\subsection{Backend Core — \file{backend/core/}}
+
+\subsubsection{\file{config.py} — Gestion de la Configuration}
+
+\begin{tcolorbox}[toolbox, title={Rôle : Centralisation de la Configuration}]
+\textbf{Technologie :} Pydantic Settings + python-dotenv\\
+\textbf{Responsabilité :} Lecture et validation de toutes les variables d'environnement.
+La classe \texttt{Settings} valide automatiquement les types, génère des chemins absolus
+cross-platform (Windows / Linux), et crée les répertoires nécessaires au démarrage.
+\end{tcolorbox}
+
+Variables principales gérées :
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{llp{6cm}}
+\toprule
+\textbf{Variable} & \textbf{Défaut} & \textbf{Rôle} \\
+\midrule
+\rowcolor{primary!5}
+\texttt{GEMINI\_API\_KEY} & \textit{None} & Clé Google Gemini AI (RAG + Checklist) \\
+\texttt{DATABASE\_URL} & SQLite local & Connexion base de données \\
+\rowcolor{primary!5}
+\texttt{UPLOAD\_DIR} & \texttt{data/uploads/} & Stockage temporaire des fichiers uploadés \\
+\texttt{CHROMA\_DIR} & \texttt{data/chroma\_db/} & Base vectorielle ChromaDB persistante \\
+\rowcolor{primary!5}
+\texttt{MOBSF\_URL} & \textit{None} & URL MobSF (\textbf{port 8008}, pas 8000) \\
+\texttt{MOBSF\_API\_KEY} & \textit{None} & Clé API MobSF (depuis le dashboard) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{tcolorbox}[warnbox, title={Attention — Conflit de ports MobSF}]
+MobSF ne doit \textbf{jamais} être configuré sur le port 8000 (réservé à FastAPI).
+Utiliser le port 8008 : \texttt{docker run -p 8008:8000 opensecurity/mobile-security-framework-mobsf}\\
+API Key MobSF : accessible sur \texttt{http://localhost:8008} $\rightarrow$ Menu $\rightarrow$ REST API.
+\end{tcolorbox}
+
+\subsubsection{\file{database.py} — Couche de Persistance}
+
+\begin{tcolorbox}[toolbox, title={Rôle : ORM SQLite + Modèles de Base de Données}]
+\textbf{Technologie :} SQLAlchemy 2.0, SQLite\\
+\textbf{Responsabilité :} Définit deux tables principales et expose une fabrique
+de sessions (\texttt{SessionLocal}).
+\end{tcolorbox}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lp{9cm}}
+\toprule
+\textbf{Table} & \textbf{Description} \\
+\midrule
+\rowcolor{primary!5}
+\texttt{reports} & Stocke le rapport JSON complet de chaque analyse (APK name, hash, JSON sérialisé) \\
+\texttt{analysis\_jobs} & Suit l'état d'un job : \texttt{pending} → \texttt{running} → \texttt{done} / \texttt{failed} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Pattern SessionLocal :} Pour éviter les sessions partagées entre threads (bug critique
+dans les BackgroundTasks), chaque opération DB crée sa propre session via \texttt{SessionLocal()}
+et la ferme dans un bloc \texttt{try/finally}.
+
+\subsubsection{\file{models.py} — Modèles de Données Métier}
+
+\begin{tcolorbox}[toolbox, title={Rôle : Contrats de Données Pydantic}]
+\textbf{Technologie :} Pydantic v2 (avec \texttt{@computed\_field})\\
+\textbf{Responsabilité :} Définit la structure de toutes les données métier.
+\end{tcolorbox}
+
+\begin{description}[leftmargin=2cm, style=nextline]
+  \item[\texttt{Finding}]
+    Représente une vulnérabilité détectée. Contient : titre, description, fichier, ligne,
+    preuve (\textit{evidence}), identifiant MASVS, test MASTG, et les scores
+    \texttt{impact} × \texttt{exploitability} × \texttt{exposure} (1-3 chacun, max 27).
+    La \textbf{sévérité} est calculée automatiquement : critique ($\geq 18$), majeur ($\geq 9$), mineur.
+
+  \item[\texttt{AuditReport}]
+    Regroupe tous les \texttt{Finding}s d'une analyse. Calcule le \textbf{score global}
+    sur 100 en déduisant des pénalités par sévérité (15 pts/critique, 5 pts/majeur, 1 pt/mineur).
+
+  \item[\texttt{ChecklistItem} / \texttt{SACItem}]
+    Représentent respectivement un élément de checklist MASVS et un critère d'acceptation Agile
+    (Security Acceptance Criteria).
+\end{description}
+
+%% ----------------------------------------------------------
+\subsection{Parseurs — \file{backend/parsers/}}
+%% ----------------------------------------------------------
+
+\subsubsection{\file{apk\_parser.py} — Décompilation des APKs Android}
+
+\begin{tcolorbox}[toolbox, title={Rôle : Extraction du contenu d'un fichier APK}]
+\textbf{Outils externes :} Apktool, JADX\\
+\textbf{Responsabilité :} Décompile l'APK Android en deux étapes successives.
+\end{tcolorbox}
+
+\begin{enumerate}[leftmargin=1.8cm, itemsep=4pt]
+  \item \textbf{Apktool} (\texttt{run\_apktool()}) : décompresse l'APK, décode les ressources
+    XML binaires (notamment \texttt{AndroidManifest.xml}) et les fichiers \texttt{smali}
+    (bytecode Dalvik). Sortie dans \texttt{extract\_dir/\{hash\}/apktool/}.
+
+  \item \textbf{JADX} (\texttt{run\_jadx()}) : décompile le bytecode \texttt{.dex}
+    en code Java lisible. Sortie dans \texttt{extract\_dir/\{hash\}/jadx/}.
+    Ce répertoire est ensuite passé à \tool{Semgrep} pour l'analyse SAST.
+\end{enumerate}
+
+\textbf{Cache intégré :} Si le répertoire de sortie existe déjà, la décompilation est
+ignorée (optimisation pour les analyses répétées du même APK).
+
+\subsubsection{\file{manifest\_parser.py} — Audit du AndroidManifest}
+
+\begin{tcolorbox}[toolbox, title={Rôle : Analyse de sécurité du Manifest Android}]
+\textbf{Technologie :} \texttt{xml.etree.ElementTree} (bibliothèque standard Python)\\
+\textbf{Responsabilité :} Analyse le fichier XML décodé pour détecter des misconfigurations
+de sécurité Android.
+\end{tcolorbox}
+
+Détections réalisées :
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item \textbf{Activités exportées} (\texttt{android:exported=true}) sans permission requise
+    $\rightarrow$ \mavscs{MASVS-AUTH-2}
+  \item \textbf{Permissions dangereuses} (CAMERA, READ\_CONTACTS, RECORD\_AUDIO)
+    $\rightarrow$ \mavscs{MASVS-AUTH-1}
+\end{itemize}
+
+\subsubsection{\file{traffic\_parser.py} — Analyse des Logs de Trafic HTTP}
+
+\begin{tcolorbox}[toolbox, title={Rôle : Extraction d'artefacts de sécurité depuis les captures réseau}]
+\textbf{Formats supportés :} Logs Burp Suite (.txt), Proxyman (.xml), HAR (.har)\\
+\textbf{Responsabilité :} Lit le fichier de trafic et détecte des patterns dangereux via regex.
+\end{tcolorbox}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lp{8.5cm}}
+\toprule
+\textbf{Méthode} & \textbf{Ce qu'elle détecte} \\
+\midrule
+\rowcolor{primary!5}
+\texttt{find\_bearer\_tokens()} & Tokens JWT dans les headers \texttt{Authorization: Bearer} \\
+\texttt{check\_insecure\_cookies()} & Cookies \texttt{Set-Cookie} sans les flags \texttt{Secure} et \texttt{HttpOnly} \\
+\rowcolor{primary!5}
+\texttt{find\_secrets\_in\_url()} & Paramètres GET contenant \texttt{token}, \texttt{session}, \texttt{api\_key} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection{\file{jwt\_parser.py} — Audit des Tokens JWT}
+
+\begin{tcolorbox}[toolbox, title={Rôle : Décodage et analyse de sécurité des JWTs}]
+\textbf{Technologie :} PyJWT 2.8+\\
+\textbf{Responsabilité :} Décode sans vérifier la signature (mode audit) et analyse les claims.
+\end{tcolorbox}
+
+Analyses effectuées :
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item \textbf{Algorithme \texttt{none}} : signature totalement désactivée
+    $\rightarrow$ \mavscs{MASVS-AUTH-2} — \critical{CRITIQUE}
+  \item \textbf{Claim \texttt{exp} absent} : token valide indéfiniment
+    $\rightarrow$ \mavscs{MASVS-AUTH-5} — \critical{CRITIQUE}
+  \item \textbf{Claim \texttt{sub} absent} : identification du sujet manquante
+  \item \textbf{PII dans les claims} : détection de champs \texttt{email}, \texttt{phone}, \texttt{ssn}
+\end{itemize}
+
+%% ----------------------------------------------------------
+\subsection{Analyseurs — \file{backend/analyzers/}}
+%% ----------------------------------------------------------
+
+\subsubsection{\file{semgrep\_runner.py} — Analyse Statique SAST}
+
+\begin{tcolorbox}[toolbox, title={Rôle : Détection de patterns de sécurité dans le code Java/Kotlin décompilé}]
+\textbf{Technologie :} Semgrep CLI (outil open source de SAST)\\
+\textbf{Responsabilité :} Exécute les règles YAML custom sur le code Java produit par JADX.
+\end{tcolorbox}
+
+\textbf{Règles SAST implémentées} (\file{rules/semgrep/auth.yaml}) :
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lll}
+\toprule
+\textbf{Règle} & \textbf{Ce qu'elle détecte} & \textbf{MASVS} \\
+\midrule
+\rowcolor{red!6}
+\texttt{hardcoded-api-key} & Secrets codés en dur (token, API key, JWT) & \mavscs{MASVS-AUTH-7} \\
+\texttt{jwt-algorithm-none} & Algorithme JWT \texttt{none} (pas de signature) & \mavscs{MASVS-AUTH-2} \\
+\rowcolor{red!6}
+\texttt{insecure-shared-preferences} & \texttt{getSharedPreferences()} sans chiffrement & \mavscs{MASVS-AUTH-7} \\
+\texttt{token-in-url-parameter} & Token en paramètre GET (\texttt{?token=}) & \mavscs{MASVS-AUTH-9} \\
+\rowcolor{red!6}
+\texttt{ssl-verification-disabled} & TrustAllCertificates / verification MITM & \mavscs{MASVS-NETWORK-1} \\
+\texttt{sensitive-data-in-logs} & \texttt{Log.d()} avec token/password & \mavscs{MASVS-AUTH-7} \\
+\rowcolor{red!6}
+\texttt{cleartext-http-usage} & URLs HTTP en clair (\texttt{http://}) & \mavscs{MASVS-NETWORK-1} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection{\file{flow\_analyzer.py} — Analyste du Trafic (DAST)}
+
+\begin{tcolorbox}[toolbox, title={Rôle : Détection de problèmes de sécurité dans le trafic HTTP capturé}]
+\textbf{Dépendance :} Utilise TrafficParser comme source de données\\
+\textbf{Responsabilité :} Transforme les résultats bruts du TrafficParser en objets Finding MASVS.
+\end{tcolorbox}
+
+Détections réalisées par le FlowAnalyzer :
+
+\begin{itemize}[leftmargin=1.5cm]
+  \item \textbf{Fuite de token HTTP} : Bearer token présent dans les logs
+    $\rightarrow$ \mavscs{MASVS-AUTH-1}
+  \item \textbf{Cookie non sécurisé} : manque \texttt{Secure} ou \texttt{HttpOnly}
+    $\rightarrow$ \mavscs{MASVS-AUTH-3}
+  \item \textbf{Secret dans l'URL} : paramètres GET sensibles
+    $\rightarrow$ \mavscs{MASVS-AUTH-2}
+\end{itemize}
+
+\subsubsection{\file{runner.py} — Chef d'Orchestre du Pipeline d'Analyse}
+
+\begin{tcolorbox}[toolbox, title={Rôle : Coordination complète du pipeline SAST/DAST/IA}]
+\textbf{Pattern :} Async Background Task (FastAPI BackgroundTasks)\\
+\textbf{Responsabilité :} Orchestre séquentiellement toutes les étapes d'analyse et
+met à jour le job en temps réel.
+\end{tcolorbox}
+
+\textbf{Voir Section \ref{sec:pipeline} pour le détail complet du pipeline d'analyse.}
+
+%% ----------------------------------------------------------
+\subsection{Intelligence Artificielle — \file{backend/ai/}}
+%% ----------------------------------------------------------
+
+\subsubsection{\file{rag\_engine.py} — Moteur RAG (Retrieval-Augmented Generation)}
+
+\begin{tcolorbox}[toolbox, title={Rôle : Base de Connaissances Vectorielle MASVS}]
+\textbf{Technologies :} ChromaDB (base vectorielle), SentenceTransformer (modèle MiniLM)\\
+\textbf{Responsabilité :} Indexe les 17 règles MASVS et récupère les plus pertinentes
+pour contextualiser les prompts envoyés à Gemini.
+\end{tcolorbox}
+
+\textbf{Fonctionnement du RAG en 3 étapes :}
+
+\begin{enumerate}[leftmargin=1.8cm, itemsep=4pt]
+  \item \textbf{Indexation} (\textit{une seule fois}) : les 17 règles MASVS du fichier
+    \file{masvs\_auth\_full.json} sont transformées en vecteurs numériques (embeddings)
+    par le modèle \texttt{all-MiniLM-L6-v2} et stockées dans ChromaDB.
+
+  \item \textbf{Requête} : à chaque génération de checklist, une requête en langage naturel
+    est vectorisée et comparée aux vecteurs stockés par similarité cosinus.
+
+  \item \textbf{Contexte} : les $n$ règles les plus similaires (défaut : 5) sont retournées
+    comme contexte textuel et injectées dans le prompt Gemini.
+\end{enumerate}
+
+\textbf{Avantage :} L'IA ne connaît pas seulement les règles MASVS de manière générale
+-- elle reçoit les règles \textit{précisément pertinentes} pour ce type d'authentification
+(JWT vs OAuth2 vs Sessions), ce qui améliore considérablement la qualité des checklists.
+
+\subsubsection{\file{llm\_client.py} — Client IA Gemini}
+
+\begin{tcolorbox}[toolbox, title={Rôle : Interface unifiée avec l'IA Google Gemini}]
+\textbf{Technologies :} LangChain, langchain-google-genai, Gemini 2.5 Flash\\
+\textbf{Responsabilité :} Deux fonctions principales de génération par IA.
+\end{tcolorbox}
+
+\begin{description}[leftmargin=2cm, style=nextline]
+  \item[\texttt{generate\_executive\_summary()}]
+    Génère un résumé exécutif en français des vulnérabilités détectées par le SAST/DAST,
+    enrichi par le contexte MASVS du RAG.
+
+  \item[\texttt{generate\_auth\_checklist()}]
+    Génère un document JSON structuré contenant :
+    \begin{itemize}
+      \item Une \textbf{checklist} de tests (SAST + DAST) avec MASVS ref, MASTG test, niveau de risque
+      \item Des \textbf{Security Acceptance Criteria} (SAC) en style Gherkin
+      \item Des \textbf{scénarios Gherkin} (Given/When/Then) pour User Stories Jira
+      \item Des \textbf{risques de conception} (Session Fixation, Token Rotation, etc.)
+    \end{itemize}
+\end{description}
+
+\textbf{Prompt Engineering :} Le prompt injecte le contexte architectural (type auth,
+stockage, timeout, MFA, cert pinning) et le contexte MASVS RAG pour des résultats
+hautement contextualisés.
+
+%% ----------------------------------------------------------
+\subsection{API REST — \file{backend/api/routes/}}
+%% ----------------------------------------------------------
+
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{llp{6cm}}
+\toprule
+\textbf{Route} & \textbf{Méthode} & \textbf{Rôle} \\
+\midrule
+\rowcolor{primary!5}
+\texttt{/api/upload/apk} & POST & Upload d'un APK ou fichier de logs. Retourne \texttt{file\_id} + SHA-256 \\
+\texttt{/api/analyze/start} & POST & Lance le pipeline d'analyse en arrière-plan. Retourne \texttt{job\_id} \\
+\rowcolor{primary!5}
+\texttt{/api/jobs/} & GET & Liste les 20 derniers jobs (tri chronologique) \\
+\texttt{/api/jobs/\{id\}} & GET & État en temps réel d'un job (\texttt{pending/running/done/failed}) \\
+\rowcolor{primary!5}
+\texttt{/api/report/} & GET & Liste des 20 derniers rapports \\
+\texttt{/api/report/\{id\}} & GET & Rapport complet (Pydantic AuditReport) \\
+\rowcolor{primary!5}
+\texttt{/api/export/\{id\}/markdown} & GET & Téléchargement rapport format Markdown \\
+\texttt{/api/export/\{id\}/json} & GET & Téléchargement rapport format JSON \\
+\rowcolor{primary!5}
+\texttt{/api/auth-audit/generate-checklist} & POST & Génération checklist MASVS + SAC par IA \\
+\texttt{/health} & GET & Vérification de disponibilité de l'API \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%% ----------------------------------------------------------
+\subsection{Frontend — \file{frontend/src/}}
+%% ----------------------------------------------------------
+
+\subsubsection{Architecture des Composants React}
+
+\begin{tcolorbox}[toolbox, title={Stack Frontend}]
+\textbf{Technologies :} React 18, TypeScript, TailwindCSS, Vite 5, Lucide React\\
+\textbf{Pattern :} Single Page Application (SPA) avec navigation par onglets
+\end{tcolorbox}
+
+\begin{description}[leftmargin=2cm, style=nextline]
+  \item[\file{App.tsx}]
+    Composant racine. Gère la navigation entre 4 onglets via un état local simple.
+    Affiche le header glassmorphism avec le statut de l'API.
+
+  \item[\file{Scanner.tsx}]
+    Interface principale d'analyse. Supporte le drag-and-drop de fichiers.
+    Implémente le \textbf{long-polling} (intervalle 1,5s) pour suivre l'état du job
+    en temps réel via \texttt{/api/jobs/\{id\}}.
+    Affiche les \texttt{FindingCard} expansibles avec évidence, remédiation et MASTG ref.
+
+  \item[\file{AuthAudit.tsx}]
+    Formulaire d'audit architectural complet. Expose les 8 champs de \texttt{AuthAuditRequest}
+    (type auth, stockage, refresh token, timeout, logout endpoint, cert pinning, MFA, plateforme).
+    Affiche les résultats IA en 4 onglets : \textit{Checklist}, \textit{SAC Agile},
+    \textit{Gherkin}, \textit{Risques Design}.
+    Permet l'export Markdown et la copie JSON.
+
+  \item[\file{MASVSMapping.tsx}]
+    Cartographie statique des 35 contrôles MASVS v2 répartis en 6 catégories
+    (AUTH, STORAGE, CRYPTO, NETWORK, RESILIENCE, PLATFORM) avec indicateur de couverture
+    par pourcentage.
+
+  \item[\file{ReportHistory.tsx}]
+    Tableau de bord de l'historique. Affiche en parallèle les jobs récents (avec badge
+    de statut) et les rapports disponibles pour consultation et téléchargement.
+\end{description}
+
+%% ==========================================================
+\section{Pipeline d'Analyse Complet}
+\label{sec:pipeline}
+%% ==========================================================
+
+\subsection{Vue d'Ensemble du Flux}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  node distance=0.5cm,
+  step/.style={draw=#1, fill=#1!10, rounded corners=5pt,
+               text width=5.5cm, align=center, minimum height=0.85cm,
+               font=\small\bfseries, drop shadow={opacity=0.2}},
+  arrow/.style={-Stealth, thick, color=mutedtxt},
+  status/.style={font=\scriptsize\ttfamily, color=mutedtxt},
+  note/.style={font=\scriptsize\itshape, color=mutedtxt, text width=4cm, align=left}
+]
+
+\node[step=primary] (s1) {1. Upload du fichier\\{\footnotesize APK / TXT / XML / HAR}};
+\node[step=orange, below=0.4cm of s1] (s2) {2. Création du Job DB\\{\footnotesize status: pending}};
+\node[step=purple, below=0.4cm of s2] (s3) {3. Lancement Background Task\\{\footnotesize FastAPI BackgroundTasks}};
+\node[step=orange, below=0.4cm of s3] (s4) {4. Détection du type de fichier\\{\footnotesize APK → SAST | Logs → DAST}};
+
+%% Branche SAST
+\node[step=red, below left=0.6cm and 2.5cm of s4] (s5a) {5a. SAST Pipeline\\{\footnotesize Apktool → JADX}};
+\node[step=red, below=0.4cm of s5a] (s6a) {6a. ManifestParser\\{\footnotesize Activities exportées, permissions}};
+\node[step=red, below=0.4cm of s6a] (s7a) {7a. Semgrep SAST\\{\footnotesize 7 règles auth.yaml}};
+
+%% Branche DAST
+\node[step=green, below right=0.6cm and 2.5cm of s4] (s5b) {5b. DAST Pipeline\\{\footnotesize TrafficParser}};
+\node[step=green, below=0.4cm of s5b] (s6b) {6b. FlowAnalyzer\\{\footnotesize Tokens, cookies, secrets}};
+\node[step=green, below=0.4cm of s6b] (s7b) {7b. JWTParser\\{\footnotesize alg=none, exp absent, PII}};
+
+%% Fusion
+\node[step=purple, below=2.8cm of s4] (s8) {8. Agrégation des Findings\\{\footnotesize Liste unifiée Finding[]}};
+\node[step=primary, below=0.4cm of s8] (s9) {9. RAG + Gemini\\{\footnotesize Résumé exécutif IA}};
+\node[step=green, below=0.4cm of s9] (s10) {10. Sauvegarde rapport\\{\footnotesize DB SQLite + JSON}};
+\node[step=green, below=0.4cm of s10] (s11) {11. Job status: DONE\\{\footnotesize report\_id disponible}};
+
+%% Flèches principales
+\draw[arrow] (s1) -- (s2);
+\draw[arrow] (s2) -- (s3);
+\draw[arrow] (s3) -- (s4);
+\draw[arrow] (s4.south west) to[bend right=5] (s5a.north);
+\draw[arrow] (s4.south east) to[bend left=5] (s5b.north);
+\draw[arrow] (s5a) -- (s6a);
+\draw[arrow] (s6a) -- (s7a);
+\draw[arrow] (s5b) -- (s6b);
+\draw[arrow] (s6b) -- (s7b);
+\draw[arrow] (s7a.south) to[bend left=5] (s8.north west);
+\draw[arrow] (s7b.south) to[bend right=5] (s8.north east);
+\draw[arrow] (s8) -- (s9);
+\draw[arrow] (s9) -- (s10);
+\draw[arrow] (s10) -- (s11);
+
+\end{tikzpicture}
+\caption{Pipeline d'analyse complet — de l'upload au rapport final}
+\end{figure}
+
+\subsection{Détail Étape par Étape}
+
+\begin{description}[leftmargin=1.2cm, style=nextline, itemsep=8pt]
+
+  \item[\textbf{Étape 1 — Upload} (\file{upload.py})]
+    L'utilisateur soumet un fichier via l'interface drag-and-drop.
+    Le fichier est sauvegardé avec un UUID unique comme préfixe.
+    Un hash SHA-256 est calculé en streaming pour identifier l'APK de manière unique.
+    \textit{Sortie :} \texttt{\{file\_id, filename, hash, status\}}
+
+  \item[\textbf{Étape 2 — Création du Job} (\file{analyze.py})]
+    Un enregistrement \texttt{AnalysisJob} est créé en base de données avec le statut
+    \texttt{pending}. Cela permet au frontend de suivre l'état avant même que
+    l'analyse démarre.
+
+  \item[\textbf{Étape 3 — Lancement Asynchrone} (\file{analyze.py})]
+    La fonction \texttt{run\_full\_analysis()} est enregistrée comme tâche de fond
+    (\texttt{BackgroundTasks.add\_task}). La réponse HTTP est immédiatement retournée
+    au client avec le \texttt{job\_id} sans attendre la fin de l'analyse.
+
+  \item[\textbf{Étape 4 — Détection du type} (\file{runner.py})]
+    La détection se fait par l'extension du fichier :
+    \texttt{.apk} → Pipeline SAST ; \texttt{.txt/.xml/.har} → Pipeline DAST.
+
+  \item[\textbf{Étapes 5a→7a — Pipeline SAST} (APK)]
+    \begin{enumerate}
+      \item \tool{Apktool} décode les ressources XML et le bytecode smali
+      \item \tool{ManifestParser} analyse \texttt{AndroidManifest.xml}
+      \item \tool{JADX} décompile le bytecode en Java
+      \item \tool{Semgrep} applique les 7 règles YAML sur le code Java
+    \end{enumerate}
+
+  \item[\textbf{Étapes 5b→7b — Pipeline DAST} (Logs)]
+    \begin{enumerate}
+      \item \tool{TrafficParser} charge et parse le fichier de logs
+      \item \tool{FlowAnalyzer} détecte les patterns HTTP dangereux
+      \item \tool{JWTParser} décode et audite chaque token JWT trouvé
+    \end{enumerate}
+
+  \item[\textbf{Étape 8 — Agrégation}]
+    Tous les \texttt{Finding}s SAST et DAST sont réunis dans une liste unique.
+    Le score de sévérité de cada finding est automatiquement calculé.
+
+  \item[\textbf{Étape 9 — IA Gemini + RAG}]
+    Le \texttt{RAGEngine} récupère les règles MASVS pertinentes.
+    Le \texttt{LLMClient} envoie un prompt enrichi à Gemini Flash pour générer
+    un résumé exécutif en français adapté aux findings détectés.
+
+  \item[\textbf{Étapes 10→11 — Persistance et Notification}]
+    Le rapport complet est sérialisé en JSON et sauvegardé en base.
+    Le job passe au statut \texttt{done} avec le \texttt{report\_id}.
+    Le frontend (en polling) détecte le changement et affiche le rapport.
+
+\end{description}
+
+%% ==========================================================
+\section{Fonctionnement de l'Audit IA (Auth Audit)}
+%% ==========================================================
+
+\subsection{Flux de Génération de Checklist}
+
+L'onglet \textbf{Audit Auth IA} implémente un flux distinct du pipeline d'analyse.
+Il est basé sur une interaction \textit{synchrone} avec Gemini :
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  node distance=0.7cm,
+  box/.style={draw=#1!60, fill=#1!8, rounded corners=5pt,
+              text width=4.5cm, align=center, font=\small, minimum height=0.8cm},
+  arrow/.style={-Stealth, thick, color=primary!70}
+]
+\node[box=primary] (user) {\textbf{Utilisateur}\\\footnotesize Sélectionne arch. (JWT/OAuth2/Sessions + options)};
+\node[box=purple, right=1.5cm of user] (api) {\textbf{API}\\\texttt{/auth-audit/generate-checklist}};
+\node[box=orange, right=1.5cm of api] (rag) {\textbf{RAG Engine}\\\footnotesize Recherche MASVS similaires};
+\node[box=green, below=0.8cm of rag] (gemini) {\textbf{Gemini Flash}\\\footnotesize Génère JSON structuré};
+\node[box=primary, below=0.8cm of user] (result) {\textbf{Frontend}\\\footnotesize 4 onglets : Checklist, SAC, Gherkin, Risques};
+
+\draw[arrow] (user) -- (api);
+\draw[arrow] (api) -- (rag);
+\draw[arrow] (rag) -- (gemini);
+\draw[arrow] (gemini.west) to[bend right=20] (api.south);
+\draw[arrow] (api.south) to[bend right=10] (result.north east);
+\end{tikzpicture}
+\caption{Flux de génération de checklist par l'IA}
+\end{figure}
+
+\subsection{Structure de la Requête d'Audit}
+
+Le frontend envoie un objet \texttt{AuthAuditRequest} contenant :
+
+\begin{lstlisting}[language=Python, caption={Paramètres de l'AuthAuditRequest (auth\_audit.py)}]
+class AuthAuditRequest(BaseModel):
+    auth_type: str                  # JWT | OAuth2 | Sessions
+    token_storage: Optional[str]    # EncryptedSharedPrefs | Keystore | Cookie | Memory
+    has_refresh_token: Optional[bool]
+    logout_endpoint: Optional[str]  # ex: /api/auth/logout
+    session_timeout_minutes: Optional[int]
+    use_certificate_pinning: Optional[bool]
+    use_mfa: Optional[bool]
+    platforms: Optional[str] = "Android"  # Android | iOS | Both
+\end{lstlisting}
+
+\subsection{Structure de la Réponse JSON}
+
+Gemini retourne un JSON structuré en 4 sections :
+
+\begin{lstlisting}[language=json, caption={Structure du JSON retourné par Gemini}]
+{
+  "checklist": [
+    {
+      "id": 1,
+      "title": "Verifier la duree de vie du token",
+      "description": "Description technique detaillee...",
+      "test_type": "BOTH",      // SAST | DAST | BOTH
+      "masvs_ref": "MASVS-AUTH-5",
+      "mastg_test": "MASTG-TEST-0024",
+      "risk_level": "HIGH"      // HIGH | MEDIUM | LOW
+    }
+  ],
+  "acceptance_criteria": [
+    "Given un utilisateur authentifie, When le token expire, Then..."
+  ],
+  "gherkin_scenarios": [
+    {
+      "user_story": "US-SEC-01 : Gestion du cycle de vie des tokens",
+      "scenario": "Given ... \n  When ... \n  Then ...",
+      "masvs_ref": "MASVS-AUTH-5"
+    }
+  ],
+  "design_risks": [
+    {
+      "risk": "Session Fixation",
+      "description": "Description du risque de conception",
+      "mitigation": "Recommandation concrete"
+    }
+  ]
+}
+\end{lstlisting}
+
+%% ==========================================================
+\section{Standards de Sécurité — OWASP MASVS v2}
+%% ==========================================================
+
+\subsection{Couverture des Contrôles MASVS}
+
+L'outil couvre 35 contrôles répartis en 6 catégories MASVS v2 :
+
+\begin{center}
+\begin{tikzpicture}
+\begin{axis}[
+  xbar,
+  width=12cm,
+  height=7cm,
+  xmin=0, xmax=115,
+  xlabel={Couverture (\%)},
+  symbolic y coords={
+    MASVS-PLATFORM, MASVS-RESILIENCE, MASVS-NETWORK,
+    MASVS-CRYPTO, MASVS-STORAGE, MASVS-AUTH
+  },
+  ytick=data,
+  ytick style={draw=none},
+  yticklabel style={font=\small\bfseries},
+  nodes near coords,
+  nodes near coords style={font=\scriptsize, /pgf/number format/fixed},
+  bar width=0.45cm,
+  enlarge y limits=0.15,
+  grid=major,
+  grid style={dashed, color=mutedtxt!30},
+  axis line style={color=mutedtxt!50},
+  tick style={color=mutedtxt!50},
+  legend style={at={(0.98,0.02)}, anchor=south east, font=\small}
+]
+\addplot[fill=primary!70, draw=primary] coordinates {
+  (67,MASVS-PLATFORM)
+  (33,MASVS-RESILIENCE)
+  (100,MASVS-NETWORK)
+  (80,MASVS-CRYPTO)
+  (67,MASVS-STORAGE)
+  (82,MASVS-AUTH)
+};
+\end{axis}
+\end{tikzpicture}
+\end{center}
+
+\subsection{Base de Connaissances MASVS (RAG)}
+
+La base de connaissances vectorielle comprend 17 règles :
+
+\begin{longtable}{lp{5cm}p{5.5cm}}
+\toprule
+\textbf{ID MASVS} & \textbf{Titre} & \textbf{Remédiation clé} \\
+\midrule
+\endhead
+\rowcolor{primary!5}
+\mavscs{MASVS-AUTH-1} & Authentification serveur robuste & Tout contrôle côté API, pas mobile \\
+\mavscs{MASVS-AUTH-2} & Prévention bypass d'auth & Vérifications serveur uniquement \\
+\rowcolor{primary!5}
+\mavscs{MASVS-AUTH-3} & Non-usage identifiants falsifiables & UUID v4 + Keystore \\
+\mavscs{MASVS-AUTH-4} & Rate Limiting / Bruteforce & 5 tentatives / 15 min max \\
+\rowcolor{primary!5}
+\mavscs{MASVS-AUTH-5} & Timeout et inactivité & Access: 15 min, Refresh: 30 jours \\
+\mavscs{MASVS-AUTH-6} & Invalidation session au logout & Deny List côté serveur pour JWT \\
+\rowcolor{primary!5}
+\mavscs{MASVS-AUTH-7} & Stockage sécurisé des secrets & EncryptedSharedPrefs + Keystore \\
+\mavscs{MASVS-AUTH-8} & Biométrie robuste & BiometricPrompt + opération crypto \\
+\rowcolor{primary!5}
+\mavscs{MASVS-AUTH-9} & Transfert réseau sécurisé & Authorization: Bearer, pas GET \\
+\mavscs{MASVS-AUTH-10} & Rotation des Refresh Tokens & Invalider l'ancien à chaque usage \\
+\rowcolor{primary!5}
+\mavscs{MASVS-AUTH-11} & Protection fixation de session & Régénérer ID après élévation \\
+\mavscs{MASVS-STORAGE-1} & Données sensibles non en clair & AES-256-GCM + EncryptedSharedPrefs \\
+\rowcolor{primary!5}
+\mavscs{MASVS-STORAGE-2} & Pas de données dans logs & Supprimer Log.d() en production \\
+\mavscs{MASVS-STORAGE-3} & Pas de données dans backups & android:allowBackup=false \\
+\rowcolor{primary!5}
+\mavscs{MASVS-NETWORK-1} & TLS activé et configuré & TLS 1.3, rejeter les certificats invalides \\
+\mavscs{MASVS-NETWORK-2} & Certificate Pinning & SPKI pinning via OkHttp \\
+\rowcolor{primary!5}
+\mavscs{MASVS-RESILIENCE-1} & Anti-tampering & R8/ProGuard, RootBeer, intégrité APK \\
+\bottomrule
+\caption{Base de connaissances MASVS indexée dans ChromaDB}
+\end{longtable}
+
+\newcommand{\mavscs}[1]{\textcolor{mavscolor}{\texttt{\small#1}}}
+
+%% ==========================================================
+\section{Flux de Travail DevSecOps (Shift-Left)}
+%% ==========================================================
+
+\subsection{Intégration dans un Processus Agile}
+
+L'outil produit des livrables directement utilisables dans un workflow Agile/Scrum :
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[
+  node distance=0.8cm,
+  phase/.style={draw=#1!60, fill=#1!10, rounded corners=6pt,
+                text width=3.2cm, align=center, minimum height=1.2cm,
+                font=\small\bfseries},
+  deliverable/.style={draw=mutedtxt!60, fill=white, rounded corners=3pt,
+                      text width=2.8cm, align=center, font=\scriptsize,
+                      minimum height=0.7cm, dashed},
+  arrow/.style={-Stealth, thick, color=mutedtxt}
+]
+
+\node[phase=primary] (conception) {\textbf{Conception}\\ \footnotesize Sprint Planning};
+\node[phase=orange, right=1cm of conception] (dev) {\textbf{Développement}\\ \footnotesize Coding / PR};
+\node[phase=purple, right=1cm of dev] (test) {\textbf{Test}\\ \footnotesize QA / AppSec};
+\node[phase=green, right=1cm of test] (release) {\textbf{Release}\\ \footnotesize Déploiement};
+
+\node[deliverable, below=0.7cm of conception] (d1) {Checklists MASVS\\+ Risques Design};
+\node[deliverable, below=0.7cm of dev] (d2) {SAC Agile\\(User Stories)};
+\node[deliverable, below=0.7cm of test] (d3) {Scénarios Gherkin\\SAST + DAST};
+\node[deliverable, below=0.7cm of release] (d4) {Rapport PDF/MD\\+ JSON export};
+
+\draw[arrow] (conception) -- (dev);
+\draw[arrow] (dev) -- (test);
+\draw[arrow] (test) -- (release);
+
+\draw[->, dashed, color=primary!60] (conception) -- (d1);
+\draw[->, dashed, color=orange!60] (dev) -- (d2);
+\draw[->, dashed, color=purple!60] (test) -- (d3);
+\draw[->, dashed, color=green!60] (release) -- (d4);
+
+\end{tikzpicture}
+\caption{Intégration des livrables de l'outil dans le cycle Agile}
+\end{figure}
+
+\subsection{Exemple de Security Acceptance Criteria (SAC)}
+
+\begin{tcolorbox}[mavsbox, title={User Story Jira — US-SEC-05 : Invalidation de session}]
+\textbf{En tant que} système d'authentification,\\
+\textbf{Je veux} invalider la session côté serveur lors d'une déconnexion,\\
+\textbf{Afin que} les tokens volés après logout ne puissent plus être utilisés.\\[6pt]
+\textbf{Critères d'acceptation :}
+\begin{itemize}
+  \item \textit{GIVEN} un utilisateur avec un token JWT valide
+  \item \textit{WHEN} il appelle \texttt{POST /api/auth/logout}
+  \item \textit{THEN} le token est ajouté à la Deny List serveur
+  \item \textit{AND} toute requête ultérieure avec ce token retourne HTTP 401
+  \item \textit{AND} le log d'audit enregistre l'événement de déconnexion
+\end{itemize}
+\textbf{Référence MASVS :} \mavscs{MASVS-AUTH-6} | Test MASTG : \texttt{MASTG-TEST-0025}
+\end{tcolorbox}
+
+%% ==========================================================
+\section{Guide de Déploiement}
+%% ==========================================================
+
+\subsection{Prérequis Système}
+
+\begin{tcolorbox}[warnbox, title={Outils Externes Requis}]
+\begin{itemize}[itemsep=2pt]
+  \item \textbf{Python 3.11+} avec environnement virtuel (\texttt{.venv})
+  \item \textbf{Node.js 18+} pour le frontend (npm)
+  \item \textbf{Apktool} : outil de décompilation APK (Java requis)
+  \item \textbf{JADX} : décompilateur APK vers Java
+  \item \textbf{Semgrep} : outil SAST (Linux/Mac natif ; WSL recommandé sur Windows)
+  \item \textbf{Docker} (optionnel) : pour le déploiement conteneurisé
+  \item \textbf{MobSF} (optionnel) : sur port \textbf{8008} (pas 8000)
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{Configuration de l'Environnement}
+
+\begin{lstlisting}[language=bash, caption={Installation et démarrage du projet}]
+# 1. Cloner et configurer
+cp .env.example .env
+# Editer .env : ajouter GEMINI_API_KEY
+
+# 2. Backend
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+pip install -r backend/requirements.txt
+
+# Demarrer le backend (port 8000)
+python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+
+# 3. Frontend (dans un autre terminal)
+cd frontend
+npm install
+npm run dev                     # http://localhost:5173
+
+# 4. MobSF (optionnel — port 8008)
+docker run -it -p 8008:8000 opensecurity/mobile-security-framework-mobsf:latest
+# Recuperer l'API Key sur http://localhost:8008
+# Puis : MOBSF_URL=http://localhost:8008 dans .env
+\end{lstlisting}
+
+\subsection{Variables d'Environnement Complètes}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{llp{5cm}}
+\toprule
+\textbf{Variable} & \textbf{Requis} & \textbf{Description} \\
+\midrule
+\rowcolor{red!6}
+\texttt{GEMINI\_API\_KEY} & \textbf{Oui} & Clé Google AI Studio (gratuit sur aistudio.google.com) \\
+\texttt{DATABASE\_URL} & Non & SQLite par défaut (\texttt{sqlite:///./analyzer.db}) \\
+\rowcolor{primary!5}
+\texttt{SECRET\_KEY} & Prod & Clé JWT backend (32 hex chars via openssl) \\
+\texttt{MOBSF\_URL} & Non & \texttt{http://localhost:8008} (Docker MobSF) \\
+\rowcolor{primary!5}
+\texttt{MOBSF\_API\_KEY} & Non & Clé depuis dashboard MobSF (\texttt{localhost:8008}) \\
+\texttt{UPLOAD\_DIR} & Non & Auto-calculé relatif au projet \\
+\rowcolor{primary!5}
+\texttt{CHROMA\_DIR} & Non & Auto-calculé (\texttt{data/chroma\_db/}) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%% ==========================================================
+\section{Sécurité et Bonnes Pratiques Implémentées}
+%% ==========================================================
+
+\subsection{Sécurité du Backend}
+
+\begin{tcolorbox}[successbox, title={Mesures de Sécurité Implémentées}]
+\begin{itemize}[itemsep=4pt]
+  \item \textbf{Validation des entrées :} Pydantic v2 valide automatiquement tous les
+    body de requêtes API avec des contraintes strictes (types, formats, ranges)
+  \item \textbf{Isolation des sessions DB :} Chaque opération base de données utilise
+    sa propre session \texttt{SessionLocal()} fermed en \texttt{finally}
+  \item \textbf{Sanitisation des fichiers :} Les noms de fichiers sont préfixés par UUID
+    pour éviter les attaques de path traversal
+  \item \textbf{CORS configuré :} En production, restreindre \texttt{allow\_origins}
+    à l'URL du frontend uniquement
+  \item \textbf{Hashing SHA-256 :} Chaque APK est identifié par son hash cryptographique
+    pour détecter les doublons
+  \item \textbf{Chemins absolus :} Tous les chemins sont calculés via \texttt{\_\_file\_\_}
+    pour éviter les dépendances au répertoire courant
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{Scoring des Vulnérabilités}
+
+Le score de chaque finding est calculé par la formule :
+$$\text{Score} = \text{Impact} \times \text{Exploitability} \times \text{Exposure} \quad \in [1, 27]$$
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{ccc}
+\toprule
+\textbf{Score} & \textbf{Sévérité} & \textbf{Pénalité /100} \\
+\midrule
+\rowcolor{red!10}
+$\geq 18$ & \critical{CRITIQUE} & $-15$ points \\
+\rowcolor{orange!10}
+$\geq 9$ & \textcolor{orange}{\textbf{MAJEUR}} & $-5$ points \\
+$< 9$ & \textcolor{green!70!black}{\textbf{MINEUR}} & $-1$ point \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+$$\text{Score Global} = \max\!\left(0,\ 100 - \sum_{\text{findings}} \text{pénalité}(f)\right)$$
+
+%% ==========================================================
+\section{Conclusion}
+%% ==========================================================
+
+\subsection{Récapitulatif des Capacités}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabular}{llc}
+\toprule
+\textbf{Capacité} & \textbf{Technologie} & \textbf{Statut} \\
+\midrule
+\rowcolor{green!6}
+Analyse SAST Android (APK) & Apktool + JADX + Semgrep & \ok{Opérationnel} \\
+Analyse DAST trafic HTTP & TrafficParser + FlowAnalyzer & \ok{Opérationnel} \\
+\rowcolor{green!6}
+Audit tokens JWT & PyJWT + JWTParser & \ok{Opérationnel} \\
+RAG MASVS contextuel & ChromaDB + MiniLM & \ok{Opérationnel} \\
+\rowcolor{green!6}
+Génération IA checklist & Gemini 2.5 Flash & \ok{Opérationnel} \\
+Scénarios Gherkin & Gemini + Prompt Eng. & \ok{Opérationnel} \\
+\rowcolor{green!6}
+Export Markdown / JSON & FastAPI + Pydantic & \ok{Opérationnel} \\
+Suivi temps réel (polling) & FastAPI Jobs API & \ok{Opérationnel} \\
+\rowcolor{green!6}
+Couverture MASVS v2 & 17 règles RAG + 7 SAST & \ok{Opérationnel} \\
+Intégration MobSF & Port 8008 via .env & \textcolor{orange}{\textbf{Optionnel}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Architecture : Forces Clés}
+
+\begin{enumerate}[leftmargin=1.8cm, itemsep=6pt]
+  \item \textbf{Shift-Left Security :} La sécurité est intégrée dès la phase de conception
+    grâce aux checklists et SAC générées avant même d'écrire du code.
+
+  \item \textbf{Pipeline asynchrone :} L'utilisation de \texttt{BackgroundTasks} FastAPI
+    permet des analyses longues (décompilation APK, Semgrep) sans bloquer le client.
+
+  \item \textbf{RAG contextualisé :} L'injection de la base de connaissances MASVS via
+    ChromaDB garantit que Gemini produit des recommandations précises et standards-alignées.
+
+  \item \textbf{Architecture stratifiée :} Parsers → Analyzers → AI → API → Frontend
+    avec séparation nette des responsabilités, facilitant les tests et la maintenance.
+
+  \item \textbf{0 dépendance circulaire :} Chaque module a des dépendances unidirectionnelles
+    clairement définies.
+\end{enumerate}
+
+\vspace{1cm}
+
+\begin{tcolorbox}[
+  enhanced,
+  colback=darkbg,
+  colframe=primary,
+  fontupper=\color{white}\small,
+  arc=8pt, boxrule=0.8pt,
+  left=10pt, right=10pt, top=8pt, bottom=8pt
+]
+\textbf{Auth \& Session Security Analyzer} · OWASP MASVS v2 · MASTG · DevSecOps\\
+\textcolor{mutedtxt}{Pipeline SAST/DAST + RAG + Gemini API · Python FastAPI + React TypeScript}\\
+\textcolor{mutedtxt}{Build : \texttt{\textbf{0 erreurs}} Frontend | 17/17 imports Backend · Avril 2026}
+\end{tcolorbox}
+
+\end{document}

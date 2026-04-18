@@ -1,0 +1,174 @@
+rules:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RULE 1 — Hardcoded secrets & API keys (Java/Kotlin)
+  # MASVS-AUTH-7 | MASTG-TEST-0023
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: hardcoded-api-key
+    languages: [java, kotlin]
+    message: "Clé secrète ou token API codé en dur détecté dans le code source."
+    patterns:
+      - pattern-either:
+          - pattern: String $VAR = "...";
+          - pattern: val $VAR = "..."
+          - pattern: var $VAR = "..."
+      - metavariable-regex:
+          metavariable: "$VAR"
+          regex: "(?i).*(api[_-]?key|token|auth|secret|password|passwd|credential|jwt|bearer).*"
+    metadata:
+      masvs_id: "MASVS-AUTH-7"
+      mastg_test: "MASTG-TEST-0023"
+      impact: 3
+      exploitability: 2
+      exposure: 3
+      remediation: "Ne jamais hardcoder de secrets. Utilisez EncryptedSharedPreferences, Android Keystore, ou chargez-les dynamiquement depuis un serveur."
+    severity: ERROR
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RULE 2 — JWT algorithme "none" (signature désactivée)
+  # MASVS-AUTH-2 | MASTG-TEST-0020
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: jwt-algorithm-none
+    languages: [java, kotlin]
+    message: "Possible utilisation de l'algorithme JWT 'none' — la signature n'est pas validée."
+    patterns:
+      - pattern-either:
+          - pattern: |
+              "none"
+          - pattern: |
+              Algorithm.none()
+          - pattern: |
+              "alg" -> "none"
+      - metavariable-regex:
+          metavariable: "$X"
+          regex: "(?i).*none.*"
+    metadata:
+      masvs_id: "MASVS-AUTH-2"
+      mastg_test: "MASTG-TEST-0020"
+      impact: 3
+      exploitability: 3
+      exposure: 3
+      remediation: "Interdire l'algorithme 'none' côté serveur. Forcer HS256 ou RS256 et rejeter tout token avec alg='none'."
+    severity: ERROR
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RULE 3 — SharedPreferences non chiffrées pour stocker des données sensibles
+  # MASVS-AUTH-7 | MASTG-TEST-0001
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: insecure-shared-preferences
+    languages: [java, kotlin]
+    message: "getSharedPreferences() utilisé sans EncryptedSharedPreferences pour stocker des données sensibles."
+    patterns:
+      - pattern: $CTX.getSharedPreferences(...)
+      - pattern-not: EncryptedSharedPreferences.create(...)
+    metadata:
+      masvs_id: "MASVS-AUTH-7"
+      mastg_test: "MASTG-TEST-0001"
+      impact: 2
+      exploitability: 2
+      exposure: 3
+      remediation: "Remplacer getSharedPreferences() par EncryptedSharedPreferences de la bibliothèque AndroidX Security Crypto."
+    severity: WARNING
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RULE 4 — URL avec token/session en paramètre GET
+  # MASVS-AUTH-9 | MASTG-TEST-0027
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: token-in-url-parameter
+    languages: [java, kotlin]
+    message: "Token d'authentification passé en paramètre GET dans l'URL — exposé dans les logs et l'historique."
+    patterns:
+      - pattern-either:
+          - pattern: |
+              "..." + $TOKEN + "..."
+          - pattern: |
+              Uri.Builder().appendQueryParameter("token", ...)
+          - pattern: |
+              Uri.Builder().appendQueryParameter("session", ...)
+          - pattern: |
+              Uri.Builder().appendQueryParameter("api_key", ...)
+          - pattern: |
+              Uri.Builder().appendQueryParameter("auth", ...)
+    metadata:
+      masvs_id: "MASVS-AUTH-9"
+      mastg_test: "MASTG-TEST-0027"
+      impact: 2
+      exploitability: 3
+      exposure: 3
+      remediation: "Transmettre les tokens dans le header HTTP 'Authorization: Bearer <token>' ou via POST JSON uniquement."
+    severity: WARNING
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RULE 5 — Désactivation de la vérification SSL/TLS
+  # MASVS-NETWORK-1 | MASTG-TEST-0019
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: ssl-verification-disabled
+    languages: [java, kotlin]
+    message: "Vérification SSL/TLS désactivée — vulnérable aux attaques Man-in-the-Middle (MITM)."
+    patterns:
+      - pattern-either:
+          - pattern: |
+              new X509TrustManager() { ... }
+          - pattern: |
+              hostnameVerifier.verify(...)
+          - pattern: |
+              SSLContext.getInstance("SSL")
+          - pattern: |
+              TrustAllCertificates(...)
+          - pattern: |
+              setHostnameVerifier(SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER)
+    metadata:
+      masvs_id: "MASVS-AUTH-9"
+      mastg_test: "MASTG-TEST-0019"
+      impact: 3
+      exploitability: 2
+      exposure: 3
+      remediation: "Ne jamais désactiver la validation TLS. Implémenter le Certificate Pinning via OkHttp CertificatePinner."
+    severity: ERROR
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RULE 6 — Log de données sensibles (tokens, passwords)
+  # MASVS-AUTH-7 | MASTG-TEST-0023
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: sensitive-data-in-logs
+    languages: [java, kotlin]
+    message: "Données sensibles (token, mot de passe) passées dans Log.d/e/i/v — exposées dans logcat."
+    patterns:
+      - pattern-either:
+          - pattern: Log.d($TAG, $MSG)
+          - pattern: Log.e($TAG, $MSG)
+          - pattern: Log.i($TAG, $MSG)
+          - pattern: Log.v($TAG, $MSG)
+          - pattern: Log.w($TAG, $MSG)
+      - metavariable-regex:
+          metavariable: "$MSG"
+          regex: "(?i).*(token|password|passwd|secret|auth|bearer|key|credential).*"
+    metadata:
+      masvs_id: "MASVS-AUTH-7"
+      mastg_test: "MASTG-TEST-0023"
+      impact: 2
+      exploitability: 1
+      exposure: 2
+      remediation: "Supprimer tous les appels Log contenant des données sensibles. Utiliser ProGuard/R8 pour supprimer les logs en production."
+    severity: WARNING
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # RULE 7 — HTTP au lieu de HTTPS (traffic clair)
+  # MASVS-NETWORK-1 | MASTG-TEST-0019
+  # ─────────────────────────────────────────────────────────────────────────────
+  - id: cleartext-http-usage
+    languages: [java, kotlin]
+    message: "URL HTTP en clair détectée — les données ne sont pas chiffrées en transit."
+    patterns:
+      - pattern-either:
+          - pattern: |
+              "http://$HOST$PATH"
+          - pattern: |
+              URL("http://...")
+    metadata:
+      masvs_id: "MASVS-AUTH-9"
+      mastg_test: "MASTG-TEST-0019"
+      impact: 2
+      exploitability: 2
+      exposure: 2
+      remediation: "Utiliser exclusivement HTTPS. Configurer android:usesCleartextTraffic='false' dans le Manifest."
+    severity: WARNING
