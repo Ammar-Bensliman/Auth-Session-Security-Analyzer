@@ -6,6 +6,7 @@ from backend.parsers.jwt_parser import JWTParser
 from backend.parsers.manifest_parser import ManifestParser
 from backend.analyzers.semgrep_runner import SemgrepRunner
 from backend.analyzers.flow_analyzer import FlowAnalyzer
+from backend.analyzers.compliance_mapper import map_to_masvs
 from backend.ai.llm_client import LLMClient
 from backend.ai.rag_engine import RAGEngine
 from backend.core.config import settings
@@ -32,7 +33,7 @@ def _update_job(job_id: str, status: str, progress: str, report_id: str = None, 
 async def run_full_analysis(file_id: str, apk_hash: str, filename: str):
     print(f"[*] Démarrage de l'analyse pour {filename} (ID: {file_id})")
 
-    _update_job(file_id, "running", "Démarrage de l'analyse...")
+    _update_job(file_id, "PENDING", "Démarrage de l'analyse...")
 
     # Determine file type from extension
     is_log_file = filename.endswith(".txt") or filename.endswith(".xml") or filename.endswith(".har")
@@ -43,12 +44,12 @@ async def run_full_analysis(file_id: str, apk_hash: str, filename: str):
     try:
         if not os.path.exists(file_path):
             print(f"Fichier inexistant : {file_path}. Mode simulation.")
-            _update_job(file_id, "running", "Fichier non trouvé — mode simulation.")
+            _update_job(file_id, "PENDING", "Fichier non trouvé — mode simulation.")
 
         elif is_log_file:
             # ─── Analyse de trafic HTTP ───────────────────────────────────────────
             print("[*] Analyse de trafic dynamique identifiée.")
-            _update_job(file_id, "running", "Analyse du trafic HTTP (DAST)...")
+            _update_job(file_id, "SCANNING_SAST", "Analyse du trafic HTTP (DAST)...")
 
             parser = TrafficParser(file_path)
             analyzer = FlowAnalyzer(parser)
@@ -56,7 +57,7 @@ async def run_full_analysis(file_id: str, apk_hash: str, filename: str):
             findings.extend(traffic_findings)
 
             # Détection de tokens JWT dans le trafic
-            _update_job(file_id, "running", "Analyse des tokens JWT dans le trafic...")
+            _update_job(file_id, "SCANNING_SAST", "Analyse des tokens JWT dans le trafic...")
             bearer_tokens = parser.find_bearer_tokens()
             for token in bearer_tokens:
                 if token.count(".") == 2:  # Format JWT basique
@@ -92,13 +93,13 @@ async def run_full_analysis(file_id: str, apk_hash: str, filename: str):
         else:
             # ─── Analyse SAST d'un APK ────────────────────────────────────────────
             print("[*] Analyse SAST d'un APK identifiée.")
-            _update_job(file_id, "running", "Décompilation APK avec Apktool...")
+            _update_job(file_id, "DECOMPILING", "Décompilation APK avec Apktool...")
 
             apk_parser = ApkParser(file_path, apk_hash)
             apk_parser.run_apktool()
 
             # Analyse du Manifest Android
-            _update_job(file_id, "running", "Analyse du AndroidManifest.xml...")
+            _update_job(file_id, "SCANNING_SAST", "Analyse du AndroidManifest.xml...")
             manifest_path = apk_parser.get_manifest_path()
             if manifest_path:
                 try:
@@ -134,16 +135,21 @@ async def run_full_analysis(file_id: str, apk_hash: str, filename: str):
                     print(f"[Manifest] Erreur d'analyse : {e}")
 
             # Décompilation Java via JADX + Semgrep
-            _update_job(file_id, "running", "Décompilation Java avec JADX...")
+            _update_job(file_id, "DECOMPILING", "Décompilation Java avec JADX...")
             apk_parser.run_jadx()
 
-            _update_job(file_id, "running", "Analyse statique Semgrep (SAST)...")
-            semgrep = SemgrepRunner(apk_parser.jadx_dir)
-            sast_findings = semgrep.run()
-            findings.extend(sast_findings)
+            _update_job(file_id, "SCANNING_SAST", "Analyse statique Semgrep (SAST)...")
+            try:
+                semgrep = SemgrepRunner(apk_parser.jadx_dir)
+                sast_findings = semgrep.run()
+                findings.extend(sast_findings)
+            except Exception as e:
+                print(f"[Semgrep] Erreur lors de l'exécution: {e}")
+                # Ne bloque pas le pipeline
+
 
         # ─── RAG + LLM Report Generation ─────────────────────────────────────────
-        _update_job(file_id, "running", "Génération du résumé exécutif par IA (Gemini)...")
+        _update_job(file_id, "AI_ANALYSIS", "Génération du résumé exécutif par IA (Gemini)...")
         llm = LLMClient()
         try:
             rag = RAGEngine()
@@ -160,13 +166,26 @@ async def run_full_analysis(file_id: str, apk_hash: str, filename: str):
 
         summary = llm.generate_executive_summary(findings_str, rag_context)
 
+        _update_job(file_id, "AI_ANALYSIS", "Mapping MASVS par IA...")
+        import json
+        llm_mapping_json = []
+        try:
+            raw_llm_mapping = llm.generate_masvs_mapping(findings_str, rag_context)
+            if raw_llm_mapping:
+                llm_mapping_json = json.loads(raw_llm_mapping)
+        except Exception as e:
+            print(f"[LLM Mapping] Erreur: {e}")
+
+        masvs_mapping_result = map_to_masvs(findings, llm_mapping_json)
+
         # ─── Sauvegarde du rapport ────────────────────────────────────────────────
-        _update_job(file_id, "running", "Sauvegarde du rapport en base de données...")
+        _update_job(file_id, "AI_ANALYSIS", "Sauvegarde du rapport en base de données...")
         report = AuditReport(
             apk_hash=apk_hash,
             apk_name=filename,
             findings=findings,
-            executive_summary=summary
+            executive_summary=summary,
+            masvs_mapping=masvs_mapping_result
         )
 
         db_report = ReportDBModel(
@@ -184,7 +203,7 @@ async def run_full_analysis(file_id: str, apk_hash: str, filename: str):
         finally:
             save_db.close()
 
-        _update_job(file_id, "done", f"Analyse terminée — {len(findings)} finding(s) détecté(s).", report_id=report.id)
+        _update_job(file_id, "COMPLETED", f"Analyse terminée — {len(findings)} finding(s) détecté(s).", report_id=report.id)
         print(f"[*] Analyse terminée (Rapport ID: {report.id})")
 
     except Exception as exc:

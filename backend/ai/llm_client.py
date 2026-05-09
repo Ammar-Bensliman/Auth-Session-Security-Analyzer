@@ -45,6 +45,12 @@ def _is_not_found_error(exc: Exception) -> bool:
     return "404" in msg or "NOT_FOUND" in msg or "not found" in msg.lower()
 
 
+def _is_temporary_error(exc: Exception) -> bool:
+    """Détecte une erreur 503 UNAVAILABLE ou 500 (temporaire)."""
+    msg = str(exc)
+    return "503" in msg or "UNAVAILABLE" in msg or "high demand" in msg.lower() or "500" in msg or "Internal Server Error" in msg
+
+
 def _build_llm(model: str) -> ChatGoogleGenerativeAI:
     """Construit un client LangChain pour un modèle Gemini donné."""
     return ChatGoogleGenerativeAI(
@@ -84,27 +90,36 @@ class LLMClient:
             if _EXHAUSTED.get(model):
                 continue
 
-            try:
-                print(f"[LLM] Tentative avec : {model}")
-                llm = _build_llm(model)
-                chain = prompt_template | llm
-                result = chain.invoke(variables)
-                print(f"[LLM] Succès avec : {model}")
-                return result.content
+            for attempt in range(2):
+                try:
+                    print(f"[LLM] Tentative {attempt+1}/2 avec : {model}")
+                    llm = _build_llm(model)
+                    chain = prompt_template | llm
+                    result = chain.invoke(variables)
+                    print(f"[LLM] Succès avec : {model}")
+                    return result.content
 
-            except Exception as exc:
-                last_error = exc
-                if _is_quota_error(exc):
-                    print(f"[LLM] Quota épuisé pour {model} (429) — passage au suivant.")
-                    _EXHAUSTED[model] = True
-                    time.sleep(0.5)
-                elif _is_not_found_error(exc):
-                    print(f"[LLM] Modèle introuvable : {model} (404) — passage au suivant.")
-                    _EXHAUSTED[model] = True
-                else:
-                    # Autre erreur (réseau, auth, etc.) → on lève immédiatement
-                    print(f"[LLM] Erreur inattendue avec {model} : {exc}")
-                    raise
+                except Exception as exc:
+                    last_error = exc
+                    if _is_temporary_error(exc):
+                        print(f"[LLM] Erreur temporaire 503/500 avec {model} (essai {attempt+1}/2).")
+                        if attempt == 0:
+                            time.sleep(2)
+                            continue
+                        else:
+                            break # Passer au modèle suivant
+                    elif _is_quota_error(exc):
+                        print(f"[LLM] Quota épuisé pour {model} (429) — passage au suivant.")
+                        _EXHAUSTED[model] = True
+                        break # Passer au modèle suivant
+                    elif _is_not_found_error(exc):
+                        print(f"[LLM] Modèle introuvable : {model} (404) — passage au suivant.")
+                        _EXHAUSTED[model] = True
+                        break # Passer au modèle suivant
+                    else:
+                        # Autre erreur (réseau, auth, etc.) → on lève immédiatement
+                        print(f"[LLM] Erreur inattendue avec {model} : {exc}")
+                        raise
 
         raise RuntimeError(
             f"Tous les modèles Gemini sont indisponibles. "
@@ -137,6 +152,42 @@ class LLMClient:
             return _fallback_executive_summary(findings_text)
         except Exception as e:
             return f"Résumé non disponible (erreur IA : {type(e).__name__}). Consulter les findings ci-dessous."
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Mapping MASVS
+    # ──────────────────────────────────────────────────────────────────────────
+
+    def generate_masvs_mapping(self, findings_text: str, rag_context: str = "") -> str:
+        """Génère le mapping MASVS en JSON à partir des findings SAST/DAST."""
+        if not self.api_key:
+            return "[]"  # Mode simulation géré par le compliance_mapper
+
+        prompt = PromptTemplate.from_template(
+            "Tu es un expert en cybersécurité mobile Android.\n"
+            "Analyse les fichiers et findings suivants (AndroidManifest.xml, JADX, Semgrep, trafic réseau) :\n"
+            "{findings}\n\n"
+            "Contexte MASVS (RAG) :\n{rag_context}\n\n"
+            "Identifie les mécanismes de session utilisés (JWT, Sessions Stateful, OAuth2) "
+            "et évalue la conformité par rapport au MASVS v2.\n"
+            "Retourne UNIQUEMENT un tableau JSON valide (sans markdown) de cette structure exacte :\n"
+            "[\n"
+            "  {{\"id_masvs\": \"MASVS-AUTH-X\", \"status\": \"absent\", \"evidence_code\": \"...\", \"remediation\": \"...\"}}\n"
+            "]\n"
+            "Status possibles: 'covered', 'partial', 'absent'. "
+            "Si une exigence est clairement non respectée, mets 'absent'. "
+            "Ne renvoie que du JSON valide."
+        )
+
+        try:
+            raw = self._invoke_with_fallback(
+                prompt, {"findings": findings_text, "rag_context": rag_context or "Non disponible."}
+            )
+            cleaned = _clean_json_response(raw)
+            json.loads(cleaned) # Validate JSON
+            return cleaned
+        except Exception as e:
+            print(f"[LLM] Erreur mapping MASVS : {e}")
+            return "[]"
 
     # ──────────────────────────────────────────────────────────────────────────
     # Checklist MASVS + SAC Agile + Gherkin

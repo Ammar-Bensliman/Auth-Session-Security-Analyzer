@@ -5,9 +5,10 @@ import {
   Zap, FileSearch, Hash, Clock, BarChart3, RefreshCw
 } from 'lucide-react';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://127.0.0.1:8000';
+const envUrl = (import.meta as any).env?.VITE_API_URL;
+const API_BASE_URL = envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1') ? envUrl : `http://${window.location.hostname}:8000`;
 
-type Status = 'idle' | 'uploading' | 'pending' | 'running' | 'done' | 'failed' | 'error';
+type Status = 'idle' | 'uploading' | 'pending' | 'PENDING' | 'DECOMPILING' | 'SCANNING_SAST' | 'AI_ANALYSIS' | 'COMPLETED' | 'FAILED' | 'error';
 
 interface Finding {
   id: string;
@@ -190,13 +191,14 @@ const Scanner = () => {
         if (!res.ok) return;
         const job = await res.json();
         setProgress(job.progress || '');
-        setStatus(job.status);
+        const backendStatus = job.status.toUpperCase() as Status;
+        setStatus(backendStatus);
 
-        if (job.status === 'done' && job.report_id) {
+        if (backendStatus === 'COMPLETED' && job.report_id) {
           stopPolling();
           const rep = await fetch(`${API_BASE_URL}/api/report/${job.report_id}`);
           if (rep.ok) setReport(await rep.json());
-        } else if (job.status === 'failed') {
+        } else if (backendStatus === 'FAILED') {
           stopPolling();
           setErrorMsg(job.error_message || "L'analyse a échoué.");
         }
@@ -259,8 +261,8 @@ const Scanner = () => {
     window.open(`${API_BASE_URL}/api/export/${report.id}/markdown`, '_blank');
   };
 
-  const isIdle = status === 'idle' || status === 'error' || status === 'done';
-  const isBusy = status === 'uploading' || status === 'pending' || status === 'running';
+  const isIdle = status === 'idle' || status === 'error' || status === 'COMPLETED' || status === 'FAILED';
+  const isBusy = !isIdle;
 
   const criticals = report?.findings.filter(f => f.severity === 'critical').length ?? 0;
   const majors    = report?.findings.filter(f => f.severity === 'major').length ?? 0;
@@ -270,8 +272,8 @@ const Scanner = () => {
   const STEPS = ['Upload', 'Décompilation', 'SAST/DAST', 'IA Rapport'];
   const stepIndex =
     status === 'uploading' ? 0 :
-    status === 'pending'   ? 1 :
-    status === 'running'   ? 2 : 3;
+    status === 'pending' || status === 'PENDING' || status === 'DECOMPILING' ? 1 :
+    status === 'SCANNING_SAST' ? 2 : 3;
 
   return (
     <div className="space-y-6">
@@ -356,7 +358,7 @@ const Scanner = () => {
           )}
 
           {/* PENDING / RUNNING */}
-          {(status === 'pending' || status === 'running') && (
+          {['pending', 'PENDING', 'DECOMPILING', 'SCANNING_SAST', 'AI_ANALYSIS'].includes(status) && (
             <div className="flex flex-col items-center gap-5 w-full max-w-md mx-auto">
               <Loader2 className="w-12 h-12 animate-spin" style={{ color: 'var(--accent-purple)' }} />
 
@@ -392,13 +394,13 @@ const Scanner = () => {
               </div>
 
               <p className="text-sm text-center" style={{ color: 'var(--text-muted)' }}>
-                {progress || (status === 'pending' ? 'En attente de démarrage...' : 'Analyse en cours...')}
+                {progress || (status === 'pending' || status === 'PENDING' ? 'En attente de démarrage...' : 'Analyse en cours...')}
               </p>
             </div>
           )}
 
           {/* DONE */}
-          {status === 'done' && (
+          {status === 'COMPLETED' && (
             <div
               className="flex flex-col items-center gap-2 cursor-pointer"
               onClick={e => { e.stopPropagation(); reset(); }}
@@ -410,7 +412,7 @@ const Scanner = () => {
           )}
 
           {/* ERROR */}
-          {(status === 'error' || status === 'failed') && (
+          {(status === 'error' || status === 'FAILED') && (
             <div
               className="flex flex-col items-center gap-2 cursor-pointer"
               onClick={e => { e.stopPropagation(); reset(); }}

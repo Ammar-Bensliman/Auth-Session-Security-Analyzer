@@ -20,16 +20,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Apktool (décompilation APK) ───────────────────────────────────────────────
-RUN wget -q https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool \
-        -O /usr/local/bin/apktool \
+RUN echo '#!/bin/sh\nexec java -jar /usr/local/bin/apktool.jar "$@"' > /usr/local/bin/apktool \
     && chmod +x /usr/local/bin/apktool \
-    && wget -q https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar \
+    && wget -4 https://github.com/iBotPeaches/Apktool/releases/download/v2.9.3/apktool_2.9.3.jar \
         -O /usr/local/bin/apktool.jar \
     && chmod +x /usr/local/bin/apktool.jar
 
 # ── JADX (décompilation Java) ─────────────────────────────────────────────────
 ENV JADX_VERSION=1.4.7
-RUN wget -q https://github.com/skylot/jadx/releases/download/v${JADX_VERSION}/jadx-${JADX_VERSION}.zip \
+RUN wget -4 https://github.com/skylot/jadx/releases/download/v${JADX_VERSION}/jadx-${JADX_VERSION}.zip \
     && unzip -q jadx-${JADX_VERSION}.zip -d /opt/jadx \
     && ln -s /opt/jadx/bin/jadx /usr/local/bin/jadx \
     && rm jadx-${JADX_VERSION}.zip

@@ -8,7 +8,8 @@ import AuthAudit from './components/AuthAudit';
 import MASVSMapping from './components/MASVSMapping';
 import ReportHistory from './components/ReportHistory';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://127.0.0.1:8000';
+const envUrl = (import.meta as any).env?.VITE_API_URL;
+const API_BASE_URL = envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1') ? envUrl : `http://${window.location.hostname}:8000`;
 
 type Tab = 'scanner' | 'audit' | 'mapping' | 'history';
 

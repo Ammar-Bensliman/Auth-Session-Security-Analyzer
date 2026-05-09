@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field, computed_field
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 import uuid
 
@@ -50,6 +50,7 @@ class AuditReport(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     findings: List[Finding] = []
     masvs_coverage: Dict[str, float] = {}  # e.g., {"MASVS-AUTH": 0.85}
+    masvs_mapping: Dict[str, Any] = {}     # Résultat du Compliance Mapper
     checklist: List[ChecklistItem] = []
     sac_items: List[SACItem] = []
     executive_summary: str = ""

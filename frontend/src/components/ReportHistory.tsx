@@ -5,7 +5,8 @@ import {
   Zap, BarChart3, Calendar, Hash, X
 } from 'lucide-react';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://127.0.0.1:8000';
+const envUrl = (import.meta as any).env?.VITE_API_URL;
+const API_BASE_URL = envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1') ? envUrl : `http://${window.location.hostname}:8000`;
 
 interface ReportSummary {
   id: string;

@@ -1,5 +1,5 @@
-import React from 'react';
-import { BookOpen, CheckCircle, Shield, Wifi, Key, Globe, Database, Cpu, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { BookOpen, Shield, Wifi, Key, Globe, Database, Cpu, TrendingUp } from 'lucide-react';
 
 const MASVS_CATEGORIES = [
   {
@@ -108,30 +108,66 @@ const STATUS_CONFIG = {
   covered: {
     label: 'Couvert',
     icon: '✓',
-    badgeStyle: { background: 'rgba(52,211,153,0.12)', color: '#6ee7b7', border: '1px solid rgba(52,211,153,0.25)' },
-    dotColor: '#34d399',
+    badgeStyle: { background: 'rgba(16, 185, 129, 0.12)', color: '#10B981', border: '1px solid rgba(16, 185, 129, 0.25)' },
+    dotColor: '#10B981',
   },
   partial: {
     label: 'Partiel',
     icon: '⚡',
-    badgeStyle: { background: 'rgba(79,158,248,0.12)', color: '#93c5fd', border: '1px solid rgba(79,158,248,0.25)' },
-    dotColor: '#4f9ef8',
+    badgeStyle: { background: 'rgba(245, 158, 11, 0.12)', color: '#F59E0B', border: '1px solid rgba(245, 158, 11, 0.25)' },
+    dotColor: '#F59E0B',
   },
   missing: {
     label: 'Absent',
     icon: '✗',
-    badgeStyle: { background: 'rgba(248,113,113,0.12)', color: '#fca5a5', border: '1px solid rgba(248,113,113,0.25)' },
-    dotColor: '#f87171',
+    badgeStyle: { background: 'rgba(239, 68, 68, 0.12)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.25)' },
+    dotColor: '#EF4444',
   },
 };
 
+const envUrl = (import.meta as any).env?.VITE_API_URL;
+const API_BASE_URL = envUrl && !envUrl.includes('localhost') && !envUrl.includes('127.0.0.1') ? envUrl : `http://${window.location.hostname}:8000`;
+
 const MASVSMapping = () => {
-  const totalCovered = MASVS_CATEGORIES.reduce((n, c) =>
+  const [categories, setCategories] = useState(MASVS_CATEGORIES);
+
+  useEffect(() => {
+    const fetchMapping = async () => {
+      try {
+        const resList = await fetch(`${API_BASE_URL}/api/report/`);
+        if (!resList.ok) throw new Error();
+        const list = await resList.json();
+        if (list.length > 0) {
+          const latestId = list[0].id;
+          const resDetail = await fetch(`${API_BASE_URL}/api/report/${latestId}`);
+          if (resDetail.ok) {
+            const detail = await resDetail.json();
+            if (detail.masvs_mapping && detail.masvs_mapping.mapping) {
+              const apiMapping = detail.masvs_mapping.mapping;
+              const newCats = MASVS_CATEGORIES.map(cat => ({
+                ...cat,
+                reqs: cat.reqs.map(req => ({
+                  ...req,
+                  status: apiMapping[req.id] || req.status
+                }))
+              }));
+              setCategories(newCats);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch dynamic MASVS mapping", err);
+      }
+    };
+    fetchMapping();
+  }, []);
+
+  const totalCovered = categories.reduce((n, c) =>
     n + c.reqs.filter(r => r.status === 'covered').length, 0);
-  const totalPartial = MASVS_CATEGORIES.reduce((n, c) =>
+  const totalPartial = categories.reduce((n, c) =>
     n + c.reqs.filter(r => r.status === 'partial').length, 0);
-  const total = MASVS_CATEGORIES.reduce((n, c) => n + c.reqs.length, 0);
-  const pct = Math.round((totalCovered / total) * 100);
+  const total = categories.reduce((n, c) => n + c.reqs.length, 0);
+  const pct = total > 0 ? Math.round((totalCovered / total) * 100) : 0;
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -157,17 +193,17 @@ const MASVSMapping = () => {
 
         {/* Global stats */}
         <div className="grid grid-cols-3 gap-3 mt-4">
-          <div className="stat-block" style={{ background: 'rgba(52,211,153,0.06)', borderColor: 'rgba(52,211,153,0.2)' }}>
-            <span className="stat-value" style={{ color: '#34d399' }}>{totalCovered}</span>
-            <span className="stat-label" style={{ color: '#34d399' }}>Couverts</span>
+          <div className="stat-block" style={{ background: 'rgba(16, 185, 129, 0.06)', borderColor: 'rgba(16, 185, 129, 0.2)' }}>
+            <span className="stat-value" style={{ color: '#10B981' }}>{totalCovered}</span>
+            <span className="stat-label" style={{ color: '#10B981' }}>Couverts</span>
           </div>
-          <div className="stat-block" style={{ background: 'rgba(79,158,248,0.06)', borderColor: 'rgba(79,158,248,0.2)' }}>
-            <span className="stat-value" style={{ color: '#4f9ef8' }}>{totalPartial}</span>
-            <span className="stat-label" style={{ color: '#4f9ef8' }}>Partiels</span>
+          <div className="stat-block" style={{ background: 'rgba(245, 158, 11, 0.06)', borderColor: 'rgba(245, 158, 11, 0.2)' }}>
+            <span className="stat-value" style={{ color: '#F59E0B' }}>{totalPartial}</span>
+            <span className="stat-label" style={{ color: '#F59E0B' }}>Partiels</span>
           </div>
-          <div className="stat-block" style={{ background: 'rgba(248,113,113,0.06)', borderColor: 'rgba(248,113,113,0.2)' }}>
-            <span className="stat-value" style={{ color: '#f87171' }}>{total - totalCovered - totalPartial}</span>
-            <span className="stat-label" style={{ color: '#f87171' }}>Absents</span>
+          <div className="stat-block" style={{ background: 'rgba(239, 68, 68, 0.06)', borderColor: 'rgba(239, 68, 68, 0.2)' }}>
+            <span className="stat-value" style={{ color: '#EF4444' }}>{total - totalCovered - totalPartial}</span>
+            <span className="stat-label" style={{ color: '#EF4444' }}>Absents</span>
           </div>
         </div>
 
@@ -181,7 +217,7 @@ const MASVSMapping = () => {
               <TrendingUp className="w-3.5 h-3.5" />
               Couverture MASVS globale
             </span>
-            <span className="font-black text-xl" style={{ color: pct >= 70 ? '#34d399' : pct >= 40 ? '#fb923c' : '#f87171' }}>
+            <span className="font-black text-xl" style={{ color: pct >= 70 ? '#10B981' : pct >= 40 ? '#F59E0B' : '#EF4444' }}>
               {pct}%
             </span>
           </div>
@@ -191,10 +227,10 @@ const MASVSMapping = () => {
               style={{
                 width: `${pct}%`,
                 background: pct >= 70
-                  ? 'linear-gradient(90deg,#34d399,#22d3ee)'
+                  ? 'linear-gradient(90deg, #10B981, #22d3ee)'
                   : pct >= 40
-                    ? 'linear-gradient(90deg,#fb923c,#fbbf24)'
-                    : 'linear-gradient(90deg,#f87171,#fb923c)',
+                    ? 'linear-gradient(90deg, #F59E0B, #fbbf24)'
+                    : 'linear-gradient(90deg, #EF4444, #F59E0B)',
               }}
             />
           </div>
@@ -206,9 +242,9 @@ const MASVSMapping = () => {
 
       {/* ── Categories grid ───────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {MASVS_CATEGORIES.map((cat, catIdx) => {
+        {categories.map((cat, catIdx) => {
           const coveredCount = cat.reqs.filter(r => r.status === 'covered').length;
-          const catPct = Math.round((coveredCount / cat.reqs.length) * 100);
+          const catPct = cat.reqs.length > 0 ? Math.round((coveredCount / cat.reqs.length) * 100) : 0;
 
           return (
             <div
