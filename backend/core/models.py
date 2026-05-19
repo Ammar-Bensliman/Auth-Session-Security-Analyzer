@@ -59,13 +59,14 @@ class AuditReport(BaseModel):
     def overall_score(self) -> float:
         if not self.findings:
             return 100.0
-        # Simple scoring logic: detract points for each finding based on severity
-        penalty = 0
+        # Utilisation d'une courbe de pénalité (décroissance exponentielle)
+        # Chaque type de sévérité réduit le score d'un certain pourcentage.
+        score = 100.0
         for f in self.findings:
             if f.severity == "critical":
-                penalty += 15
+                score *= 0.90  # -10% par faille critique
             elif f.severity == "major":
-                penalty += 5
+                score *= 0.95  # -5% par faille majeure
             else:
-                penalty += 1
-        return max(0.0, 100.0 - penalty)
+                score *= 0.98  # -2% par faille mineure
+        return max(0.0, score)

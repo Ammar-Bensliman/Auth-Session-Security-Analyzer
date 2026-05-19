@@ -43,7 +43,7 @@ const JobStatusBadge = ({ status }: { status: string }) => {
     running: { style: { background: 'rgba(79,158,248,0.12)', color: '#93c5fd', border: '1px solid rgba(79,158,248,0.25)' }, icon: <Loader2 className="w-3 h-3 animate-spin" />, label: 'RUNNING' },
     pending: { style: { background: 'rgba(124,143,168,0.12)', color: '#94a3b8', border: '1px solid rgba(124,143,168,0.2)' }, icon: <Clock className="w-3 h-3" />, label: 'PENDING' },
   };
-  const cfg = map[status] || map['pending'];
+  const cfg = map[status] || map['pending']!;
   return (
     <span className="badge flex items-center gap-1" style={cfg.style}>
       {cfg.icon} {cfg.label}

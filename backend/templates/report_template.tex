@@ -1,0 +1,90 @@
+\documentclass[12pt,a4paper,french]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage[top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage{xcolor}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{setspace}
+\usepackage[most]{tcolorbox}
+\setstretch{1.15}
+
+\definecolor{primary}{HTML}{3B82F6}
+\definecolor{red}{HTML}{EF4444}
+\definecolor{orange}{HTML}{F59E0B}
+\definecolor{yellow}{HTML}{FBBF24}
+
+\tcbset{
+  findingbox/.style={
+    enhanced, breakable,
+    colback=gray!5!white,
+    colframe=gray!50!white,
+    fonttitle=\bfseries,
+    coltitle=black,
+    arc=4pt, boxrule=0.6pt,
+    before skip=10pt, after skip=10pt,
+    title=#1
+  }
+}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    {\Huge\bfseries Rapport d'Audit de Sécurité\par}
+    \vspace{0.5cm}
+    {\Large Auth \& Session Security Analyzer\par}
+    \vspace{2cm}
+    {\Large\bfseries Application : \VAR{apk_name}\par}
+    \vspace{0.5cm}
+    {\large Hash (SHA-256) : \texttt{\VAR{apk_hash}}\par}
+    \vspace{0.5cm}
+    {\large Date : \VAR{date}\par}
+    \vfill
+    {\Huge\bfseries Score Global : \VAR{overall_score}/100\par}
+    \vspace{2cm}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Résumé Exécutif}
+\BLOCK{if executive_summary}
+\VAR{executive_summary}
+\BLOCK{else}
+L'analyse n'a pas pu générer de résumé IA pour ce rapport.
+\BLOCK{endif}
+
+\section{Détail des Vulnérabilités (Findings)}
+Ce rapport recense \textbf{\VAR{findings_count}} vulnérabilité(s) identifiée(s).
+
+\BLOCK{for f in findings}
+\begin{tcolorbox}[findingbox={\VAR{f.title} \hfill Score: \VAR{f.score}}]
+\textbf{Sévérité :} \VAR{f.severity} \\
+\textbf{Fichier :} \texttt{\VAR{f.file_path}} \BLOCK{if f.line_number}(Ligne: \VAR{f.line_number})\BLOCK{endif} \\
+\textbf{MASVS :} \texttt{\VAR{f.masvs_id}} \hfill \textbf{MASTG :} \texttt{\VAR{f.mastg_test}}
+\tcbline
+\textbf{Description :}\\
+\VAR{f.description}
+\tcbline
+\textbf{Preuve (Evidence) :}\\
+\texttt{\VAR{f.evidence}}
+\tcbline
+\textbf{Remédiation :}\\
+\VAR{f.remediation}
+\end{tcolorbox}
+\BLOCK{endfor}
+
+\BLOCK{if findings_count == 0}
+\begin{center}
+\vspace{2cm}
+\textbf{\Large Aucune vulnérabilité n'a été détectée lors de cette analyse.}
+\end{center}
+\BLOCK{endif}
+
+\end{document}

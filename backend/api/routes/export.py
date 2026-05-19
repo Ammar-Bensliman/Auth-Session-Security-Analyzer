@@ -1,10 +1,14 @@
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import PlainTextResponse, JSONResponse
+from fastapi.responses import PlainTextResponse, JSONResponse, FileResponse
 from sqlalchemy.orm import Session
 from backend.core.database import get_db, ReportDBModel
 from backend.core.models import AuditReport
 import json
 from datetime import datetime
+import os
+import subprocess
+import tempfile
+import jinja2
 
 router = APIRouter()
 
@@ -25,10 +29,8 @@ def _severity_badge(severity: str) -> str:
     return mapping.get(severity, severity.upper())
 
 
-@router.get("/{report_id}/markdown", response_class=PlainTextResponse)
-async def export_report_markdown(report_id: str, db: Session = Depends(get_db)):
-    """Exporte un rapport d'analyse complet au format Markdown."""
-    report = _load_report(report_id, db)
+def _generate_markdown(report: AuditReport) -> str:
+    """Helper function to generate Markdown content for a report."""
     ts = report.timestamp.strftime("%d/%m/%Y à %H:%M") if report.timestamp else "N/A"
 
     lines = [
@@ -97,7 +99,14 @@ async def export_report_markdown(report_id: str, db: Session = Depends(get_db)):
         f"_Rapport généré automatiquement par **Auth & Session Security Analyzer** — MASVS v2_",
     ]
 
-    content = "\n".join(lines)
+    return "\n".join(lines)
+
+
+@router.get("/{report_id}/markdown", response_class=PlainTextResponse)
+def export_report_markdown(report_id: str, db: Session = Depends(get_db)):
+    """Exporte un rapport d'analyse complet au format Markdown."""
+    report = _load_report(report_id, db)
+    content = _generate_markdown(report)
     filename = f"rapport_{report.apk_name.replace('.', '_')}_{report_id[:8]}.md"
     return PlainTextResponse(
         content=content,
@@ -106,7 +115,7 @@ async def export_report_markdown(report_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{report_id}/json")
-async def export_report_json(report_id: str, db: Session = Depends(get_db)):
+def export_report_json(report_id: str, db: Session = Depends(get_db)):
     """Exporte un rapport d'analyse complet au format JSON brut."""
     report = _load_report(report_id, db)
     filename = f"rapport_{report.apk_name.replace('.', '_')}_{report_id[:8]}.json"
@@ -117,7 +126,7 @@ async def export_report_json(report_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{report_id}/checklist-markdown", response_class=PlainTextResponse)
-async def export_checklist_markdown(report_id: str, db: Session = Depends(get_db)):
+def export_checklist_markdown(report_id: str, db: Session = Depends(get_db)):
     """Exporte la checklist de sécurité d'un rapport au format Markdown."""
     report = _load_report(report_id, db)
 
@@ -157,3 +166,37 @@ async def export_checklist_markdown(report_id: str, db: Session = Depends(get_db
         content=content,
         headers={"Content-Disposition": f'attachment; filename="checklist_{report_id[:8]}.md"'}
     )
+
+
+@router.get("/{report_id}/pdf")
+def export_report_pdf(report_id: str, db: Session = Depends(get_db)):
+    """Exporte un rapport d'analyse complet au format PDF via markdown-pdf."""
+    report = _load_report(report_id, db)
+    
+    # 1. Générer le contenu markdown
+    md_content = _generate_markdown(report)
+    
+    # 2. Utiliser markdown-pdf pour générer le PDF
+    try:
+        from markdown_pdf import Section, MarkdownPdf
+        pdf = MarkdownPdf(toc_level=2)
+        pdf.add_section(Section(md_content))
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pdf_path = os.path.join(temp_dir, "report.pdf")
+            pdf.save(pdf_path)
+            
+            if not os.path.exists(pdf_path):
+                raise HTTPException(status_code=500, detail="Le fichier PDF n'a pas été généré.")
+                
+            with open(pdf_path, "rb") as f:
+                pdf_data = f.read()
+                
+    except Exception as e:
+        print("Erreur de génération PDF via markdown-pdf:\n", str(e))
+        raise HTTPException(status_code=500, detail="Échec de la conversion MD vers PDF.")
+            
+    # 3. Renvoyer le PDF en mémoire
+    from fastapi import Response
+    filename = f"rapport_{report.apk_name.replace('.', '_')}_{report_id[:8]}.pdf"
+    return Response(content=pdf_data, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{filename}"'})

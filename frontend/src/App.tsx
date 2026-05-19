@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, FileSearch, ShieldAlert, BookOpen,
-  History, Activity, Wifi, WifiOff, Zap
+  History, Activity, Wifi, WifiOff, Zap, Sun, Moon
 } from 'lucide-react';
-import Scanner from './components/Scanner';
+import Dashboard from './components/Dashboard';
 import AuthAudit from './components/AuthAudit';
 import MASVSMapping from './components/MASVSMapping';
 import ReportHistory from './components/ReportHistory';
@@ -23,6 +23,24 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode; badge?: string; col
 function App() {
   const [activeTab, setActiveTab] = useState<Tab>('scanner');
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved) return saved === 'dark';
+    return !window.matchMedia('(prefers-color-scheme: light)').matches;
+  });
+
+  // Apply theme class
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+      localStorage.setItem('theme', 'light');
+    }
+  }, [isDarkMode]);
 
   // Check API health
   useEffect(() => {
@@ -62,9 +80,17 @@ function App() {
             </div>
           </div>
 
-          {/* API Status pill */}
-          <div
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
+          {/* Theme Toggle & API Status */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="p-2 rounded-full hover:bg-[rgba(255,255,255,0.1)] transition-colors border border-transparent hover:border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+              aria-label="Toggle theme"
+            >
+              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            <div
+              className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
             style={{
               background: apiOnline === null
                 ? 'rgba(100,116,139,0.1)'
@@ -86,6 +112,7 @@ function App() {
             ) : (
               <><WifiOff className="w-3 h-3" /> API Hors-ligne</>
             )}
+            </div>
           </div>
         </div>
 
@@ -123,7 +150,7 @@ function App() {
       {/* ── Main Content ───────────────────────────────────────── */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-7">
         <div className="animate-fade-in-up" key={activeTab}>
-          {activeTab === 'scanner' && <Scanner />}
+          {activeTab === 'scanner' && <Dashboard />}
           {activeTab === 'audit'   && <AuthAudit />}
           {activeTab === 'mapping' && <MASVSMapping />}
           {activeTab === 'history' && <ReportHistory />}

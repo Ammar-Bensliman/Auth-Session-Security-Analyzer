@@ -37,8 +37,13 @@ httpx>=0.27.0
 # - semgrep : fonctionne nativement sur Linux (Docker) — ajouté ci-dessus
 # - androguard : `pip install androguard` (peut nécessiter Visual C++ sur Windows)
 # - WeasyPrint : `pip install weasyprint` (nécessite GTK sur Windows — non utilisé actuellement)
-# - celery + redis : non utilisés (BackgroundTasks FastAPI est utilisé à la place)
+# - celery + redis : non utilisés# Background Tasks (Celery)
+celery>=5.3.6
+
+# Templating pour rapport PDF
+Jinja2>=3.1.2
 # - alembic : non utilisé (SQLAlchemy create_all suffit)
 
 # SAST — Analyse statique de code (Linux/Docker uniquement)
 semgrep>=1.70.0
+markdown-pdf>=1.13.1 

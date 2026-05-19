@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget unzip git \
     default-jre \
     build-essential python3-dev \
+    texlive-latex-base texlive-fonts-recommended texlive-latex-extra texlive-lang-french lmodern \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Apktool (décompilation APK) ───────────────────────────────────────────────
